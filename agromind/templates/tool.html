@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="grid grid-2">
+    <section class="card">
+      <span class="badge">{{ domain.name }}</span>
+      <h1>{{ tool.title }}</h1>
+      <p class="muted">{{ tool.description }}</p>
+      {% if tool.disclaimer %}
+        <div class="alert">{{ tool.disclaimer }}</div>
+      {% endif %}
+      <form method="post" enctype="multipart/form-data" style="margin-top:1rem">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        {% for field in tool.fields %}
+          <div class="form-row">
+            <label for="{{ field.name }}">{{ field.label }}</label>
+            {% if field.type == "textarea" %}
+              <textarea id="{{ field.name }}" name="{{ field.name }}" placeholder="{{ field.placeholder or '' }}">{{ fields.get(field.name, "") }}</textarea>
+            {% elif field.type == "select" %}
+              <select id="{{ field.name }}" name="{{ field.name }}">
+                <option value="">Select {{ field.label }}</option>
+                {% for option in field.options %}
+                  <option value="{{ option }}" {% if fields.get(field.name) == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            {% else %}
+              <input id="{{ field.name }}" name="{{ field.name }}" type="{{ field.type }}" placeholder="{{ field.placeholder or '' }}" value="{{ fields.get(field.name, "") }}">
+            {% endif %}
+          </div>
+        {% endfor %}
+        {% if tool.accepts %}
+          <div class="form-row">
+            <label for="asset">Upload file</label>
+            <input id="asset" name="asset" type="file">
+          </div>
+        {% endif %}
+        <button class="button" type="submit">Generate</button>
+        <button class="button secondary" type="button" onclick="window.print()">Export PDF</button>
+      </form>
+    </section>
+    <section class="card">
+      <h2>AI Output</h2>
+      {% if error %}
+        <p class="error">{{ error }}</p>
+      {% elif output_html %}
+        <div class="output">{{ output_html|safe }}</div>
+      {% else %}
+        <p class="muted">Results, tables, and markdown reports will appear here.</p>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}

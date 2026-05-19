@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title or "AgroMind AI" }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <a class="brand" href="/">
+          <span class="brand-mark">AI</span>
+          <span>AgroMind AI<br><span class="muted" style="font-size:.8rem">Decision support platform</span></span>
+        </a>
+        <div class="nav-group">
+          <p class="nav-title">Workspace</p>
+          <a class="nav-link" href="/dashboard">Dashboard</a>
+          <a class="nav-link" href="/analytics">Analytics</a>
+          <a class="nav-link" href="/pricing">Plans</a>
+          <a class="nav-link" href="/profile">Profile</a>
+          <a class="nav-link" href="/settings">Settings</a>
+          <a class="nav-link" href="/admin">Admin</a>
+        </div>
+        <div class="nav-group">
+          <p class="nav-title">Domains</p>
+          {% for item in domains %}
+            <a class="nav-link" href="/dashboard/{{ item.id }}">{{ item.name }}</a>
+          {% endfor %}
+        </div>
+      </aside>
+      <main class="main">
+        <div class="topbar">
+          <div></div>
+          <div>
+            {% if user %}
+              <span class="muted">{{ user.email }}</span>
+              <a class="button secondary" href="/logout">Logout</a>
+            {% else %}
+              <a class="button secondary" href="/login">Login</a>
+              <a class="button" href="/signup">Sign up</a>
+            {% endif %}
+          </div>
+        </div>
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </body>
+</html>

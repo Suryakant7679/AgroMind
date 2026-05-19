@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1 class="page-title">Settings</h1>
+  <p class="muted">Configure AI providers, billing limits, and exports through `.env.local`.</p>
+  <div class="grid grid-2">
+    <div class="card">
+      <h2>Provider Keys</h2>
+      <p>Supabase Auth: <span class="badge">{{ "Configured" if configured.supabase_auth else "Missing" }}</span></p>
+      <p>Supabase Database: <span class="badge">{{ "Configured" if configured.supabase_database else "Missing service role/client key" }}</span></p>
+      <p>OpenAI: <span class="badge">{{ "Configured" if configured.openai else "Missing" }}</span></p>
+      <p>Gemini: <span class="badge">{{ "Configured" if configured.gemini else "Missing" }}</span></p>
+    </div>
+    <div class="card">
+      <h2>Defaults</h2>
+      <label>Monthly request limit</label><input value="5000">
+      <label style="margin-top:1rem">Default export format</label><input value="PDF">
+    </div>
+  </div>
+{% endblock %}

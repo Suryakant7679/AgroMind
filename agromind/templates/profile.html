@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1 class="page-title">Profile</h1>
+  <p class="muted">Manage your workspace identity and preferences.</p>
+  <div class="card" style="max-width:48rem">
+    <div class="grid grid-2">
+      <div><label>Name</label><input value="{{ profile.full_name if profile else 'AgroMind User' }}"></div>
+      <div><label>Email</label><input value="{{ profile.email if profile else user.email if user else 'user@example.com' }}"></div>
+      <div><label>Organization</label><input value="{{ profile.organization if profile else 'AgroMind Workspace' }}"></div>
+      <div><label>Plan</label><input value="{{ profile.plan if profile else 'starter' }}"></div>
+    </div>
+  </div>
+{% endblock %}

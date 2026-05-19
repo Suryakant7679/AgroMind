@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1 class="page-title">Dashboard</h1>
+  <p class="muted">Search, launch tools, monitor usage, and review recent AI outputs.</p>
+  <div class="grid grid-4" style="margin:1rem 0">
+    <div class="card metric"><span class="muted">Tools available</span><strong>{{ tools|length }}</strong><span class="muted">Across 3 AI domains</span></div>
+    <div class="card metric"><span class="muted">API usage</span><strong>2,480</strong><span class="muted">Tokens used today</span></div>
+    <div class="card metric"><span class="muted">Reports</span><strong>128</strong><span class="muted">Generated this month</span></div>
+    <div class="card metric"><span class="muted">Plan</span><strong>Pro</strong><span class="muted">18 days remaining</span></div>
+  </div>
+  {% for domain in domains %}
+    <section style="margin-top:1.5rem">
+      <h2>{{ domain.name }}</h2>
+      <p class="muted">{{ domain.tagline }}</p>
+      <div class="grid grid-3">
+        {% for tool in domain.tools %}
+          <a class="card" href="/dashboard/{{ domain.id }}/{{ tool.id }}">
+            <span class="badge">{{ domain.short_name }}</span>
+            <h3>{{ tool.title }}</h3>
+            <p class="muted">{{ tool.description }}</p>
+          </a>
+        {% endfor %}
+      </div>
+    </section>
+  {% endfor %}
+  <section style="margin-top:1.5rem">
+    <h2>Recent Outputs</h2>
+    <div class="grid">
+      {% for item in recent %}
+        <div class="card"><strong>{{ item.tool }}</strong><p class="muted">{{ item.domain }} · {{ item.created_at }}</p></div>
+      {% else %}
+        <div class="card muted">No saved outputs yet. Run any AI tool to create history.</div>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

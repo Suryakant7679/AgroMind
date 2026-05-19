@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1 class="page-title">Admin Dashboard</h1>
+  <p class="muted">Manage users, plans, usage, model access, and moderation.</p>
+  <div class="grid grid-3" style="margin:1rem 0">
+    <div class="card metric"><span class="muted">Users</span><strong>412</strong><span class="muted">27 new this week</span></div>
+    <div class="card metric"><span class="muted">Revenue</span><strong>$9.8k</strong><span class="muted">MRR estimate</span></div>
+    <div class="card metric"><span class="muted">Safety alerts</span><strong>6</strong><span class="muted">Healthcare escalations</span></div>
+  </div>
+  <div class="card">
+    <h2>User Management</h2>
+    {% for profile in users %}
+      <div class="card" style="margin:.6rem 0">
+        <strong>{{ profile.full_name or profile.email }}</strong>
+        <span class="badge" style="float:right">{{ profile.role or "member" }}</span>
+        <p class="muted">{{ profile.email }} · {{ profile.plan or "starter" }}</p>
+      </div>
+    {% else %}
+      <p class="muted">No profiles are available yet.</p>
+    {% endfor %}
+  </div>
+{% endblock %}

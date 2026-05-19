@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="card" style="max-width:30rem;margin:auto">
+    <h1>Create Account</h1>
+    <p class="muted">Create a Supabase account for AgroMind AI.</p>
+    {% if message %}<p class="error">{{ message }}</p>{% endif %}
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="next" value="{{ next }}">
+      <div class="form-row">
+        <label>Full name</label>
+        <input name="full_name" type="text" placeholder="AgroMind User">
+      </div>
+      <div class="form-row">
+        <label>Email</label>
+        <input name="email" type="email" required placeholder="user@example.com">
+      </div>
+      <div class="form-row">
+        <label>Password</label>
+        <input name="password" type="password" required minlength="6" placeholder="Minimum 6 characters">
+      </div>
+      <button class="button" type="submit">Sign up</button>
+    </form>
+    <p class="muted" style="margin-top:1rem">Already have an account? <a href="/login">Login</a>.</p>
+  </div>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="hero">
+    <span class="badge">{{ domain.short_name }}</span>
+    <h1 class="page-title" style="margin-top:1rem">{{ domain.name }}</h1>
+    <p>{{ domain.description }}</p>
+  </section>
+  <div class="grid grid-3" style="margin-top:1rem">
+    {% for tool in domain.tools %}
+      <a class="card" href="/dashboard/{{ domain.id }}/{{ tool.id }}">
+        <h2>{{ tool.title }}</h2>
+        <p class="muted">{{ tool.description }}</p>
+      </a>
+    {% endfor %}
+  </div>
+{% endblock %}
