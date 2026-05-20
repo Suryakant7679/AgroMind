@@ -1,21 +1,28 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1 class="page-title">Dashboard</h1>
-  <p class="muted">Search, launch tools, monitor usage, and review recent AI outputs.</p>
+  <h1 class="page-title" data-i18n="dashboard.title">Dashboard</h1>
+  <p class="muted" data-i18n="dashboard.subtitle">Search, launch tools, monitor usage, and review recent AI outputs.</p>
   <div class="grid grid-4" style="margin:1rem 0">
-    <div class="card metric"><span class="muted">Tools available</span><strong>{{ tools|length }}</strong><span class="muted">Across 3 AI domains</span></div>
-    <div class="card metric"><span class="muted">API usage</span><strong>2,480</strong><span class="muted">Tokens used today</span></div>
-    <div class="card metric"><span class="muted">Reports</span><strong>128</strong><span class="muted">Generated this month</span></div>
-    <div class="card metric"><span class="muted">Plan</span><strong>Pro</strong><span class="muted">18 days remaining</span></div>
+    <div class="card metric"><span class="muted" data-i18n="dashboard.toolsAvailable">Tools available</span><strong>{{ tools|length }}</strong><span class="muted" data-i18n="dashboard.acrossDomains">Across 3 AI domains</span></div>
+    <div class="card metric"><span class="muted">Requests today</span><strong>{{ usage.requests_today if usage else 0 }}</strong><span class="muted">Limit {{ current_plan.daily_requests if current_plan else 1000 }}/day</span></div>
+    <div class="card metric"><span class="muted">Tokens used</span><strong>{{ "{:,}".format(usage.tokens_this_month if usage else 0) }}</strong><span class="muted">{{ "{:,}".format((current_plan.monthly_tokens if current_plan else 250000) - (usage.tokens_this_month if usage else 0)) }} left</span></div>
+    <div class="card metric"><span class="muted" data-i18n="dashboard.plan">Plan</span><strong>{{ current_plan.name if current_plan else "Starter" }}</strong><span class="muted">{{ current_plan.model_access if current_plan else "Gemini free tier" }}</span></div>
+  </div>
+  <div class="card usage-meter">
+    {% set token_limit = current_plan.monthly_tokens if current_plan else 250000 %}
+    {% set token_used = usage.tokens_this_month if usage else 0 %}
+    {% set pct = [100, ((token_used / token_limit) * 100) if token_limit else 0]|min %}
+    <div class="usage-meter-head"><strong>Monthly token usage</strong><span>{{ "{:,}".format(token_used) }} / {{ "{:,}".format(token_limit) }}</span></div>
+    <div class="usage-bar"><span style="width: {{ pct }}%"></span></div>
   </div>
   {% for domain in domains %}
     <section style="margin-top:1.5rem">
-      <h2>{{ domain.name }}</h2>
-      <p class="muted">{{ domain.tagline }}</p>
+      <h2 data-i18n="domain.{{ domain.id }}.name">{{ domain.name }}</h2>
+      <p class="muted" data-i18n="domain.{{ domain.id }}.tagline">{{ domain.tagline }}</p>
       <div class="grid grid-3">
         {% for tool in domain.tools %}
           <a class="card" href="/dashboard/{{ domain.id }}/{{ tool.id }}">
-            <span class="badge">{{ domain.short_name }}</span>
+            <span class="badge" data-i18n="domain.{{ domain.id }}.short">{{ domain.short_name }}</span>
             <h3>{{ tool.title }}</h3>
             <p class="muted">{{ tool.description }}</p>
           </a>
@@ -24,12 +31,12 @@
     </section>
   {% endfor %}
   <section style="margin-top:1.5rem">
-    <h2>Recent Outputs</h2>
+    <h2 data-i18n="dashboard.recentOutputs">Recent Outputs</h2>
     <div class="grid">
       {% for item in recent %}
         <div class="card"><strong>{{ item.tool }}</strong><p class="muted">{{ item.domain }} · {{ item.created_at }}</p></div>
       {% else %}
-        <div class="card muted">No saved outputs yet. Run any AI tool to create history.</div>
+        <div class="card muted" data-i18n="dashboard.noOutputs">No saved outputs yet. Run any AI tool to create history.</div>
       {% endfor %}
     </div>
   </section>

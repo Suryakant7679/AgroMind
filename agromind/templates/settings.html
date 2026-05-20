@@ -9,6 +9,7 @@
       <p>Supabase Database: <span class="badge">{{ "Configured" if configured.supabase_database else "Missing service role/client key" }}</span></p>
       <p>OpenAI: <span class="badge">{{ "Configured" if configured.openai else "Missing" }}</span></p>
       <p>Gemini: <span class="badge">{{ "Configured" if configured.gemini else "Missing" }}</span></p>
+      <p>Groq: <span class="badge">{{ "Configured" if configured.groq else "Missing" }}</span></p>
     </div>
     <div class="card">
       <h2>Defaults</h2>
@@ -16,4 +17,17 @@
       <label style="margin-top:1rem">Default export format</label><input value="PDF">
     </div>
   </div>
+  <section class="card settings-section">
+    <h2>Automatic AI Routing</h2>
+    <p class="muted">Users only choose their language and task inputs. AgroMind automatically routes uploads to vision, non-English requests to multilingual AI, and analytical prompts to reasoning AI.</p>
+  </section>
+  <section class="card settings-section">
+    <h2>Language Preferences</h2>
+    <p class="muted">The app supports AI responses and speech input in these 10 languages. Groq Whisper handles multilingual speech-to-text; Groq Orpheus text-to-speech supports English and Arabic Saudi, while the browser voice engine is used for the other languages when available.</p>
+    <div class="language-grid">
+      {% for language in languages %}
+        <span class="language-chip">{{ language.name }}</span>
+      {% endfor %}
+    </div>
+  </section>
 {% endblock %}

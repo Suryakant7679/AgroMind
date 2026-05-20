@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 {% block content %}
   <section class="hero">
-    <span class="badge">Supabase + AI workflows</span>
-    <h1 class="page-title" style="margin-top:1rem">AgroMind AI</h1>
-    <p style="max-width:48rem">A multi-domain decision support platform for agriculture, healthcare, and education workflows.</p>
-    <a class="button" href="/dashboard">Open Dashboard</a>
+    <span class="badge" data-i18n="home.badge">Supabase + AI workflows</span>
+    <h1 class="page-title" style="margin-top:1rem" data-i18n="home.title">AgroMind AI</h1>
+    <p style="max-width:48rem" data-i18n="home.subtitle">A multi-domain decision support platform for agriculture, healthcare, and education workflows.</p>
+    <a class="button" href="/dashboard" data-i18n="home.openDashboard">Open Dashboard</a>
   </section>
   <div class="grid grid-3" style="margin-top:1rem">
     {% for domain in domains %}
       <a class="card" href="/dashboard/{{ domain.id }}">
-        <span class="badge">{{ domain.short_name }}</span>
-        <h2>{{ domain.name }}</h2>
-        <p class="muted">{{ domain.description }}</p>
+        <span class="badge" data-i18n="domain.{{ domain.id }}.short">{{ domain.short_name }}</span>
+        <h2 data-i18n="domain.{{ domain.id }}.name">{{ domain.name }}</h2>
+        <p class="muted" data-i18n="domain.{{ domain.id }}.description">{{ domain.description }}</p>
       </a>
     {% endfor %}
   </div>

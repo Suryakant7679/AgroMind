@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
   <section class="hero">
-    <span class="badge">{{ domain.short_name }}</span>
-    <h1 class="page-title" style="margin-top:1rem">{{ domain.name }}</h1>
-    <p>{{ domain.description }}</p>
+    <span class="badge" data-i18n="domain.{{ domain.id }}.short">{{ domain.short_name }}</span>
+    <h1 class="page-title" style="margin-top:1rem" data-i18n="domain.{{ domain.id }}.name">{{ domain.name }}</h1>
+    <p data-i18n="domain.{{ domain.id }}.description">{{ domain.description }}</p>
   </section>
   <div class="grid grid-3" style="margin-top:1rem">
     {% for tool in domain.tools %}

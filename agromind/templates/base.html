@@ -11,28 +11,34 @@
       <aside class="sidebar">
         <a class="brand" href="/">
           <span class="brand-mark">AI</span>
-          <span>AgroMind AI<br><span class="muted" style="font-size:.8rem">Decision support platform</span></span>
+          <span>AgroMind AI<br><span class="muted" style="font-size:.8rem" data-i18n="brand.subtitle">founded by surya</span></span>
         </a>
         <div class="nav-group">
-          <p class="nav-title">Workspace</p>
-          <a class="nav-link" href="/dashboard">Dashboard</a>
-          <a class="nav-link" href="/analytics">Analytics</a>
-          <a class="nav-link" href="/pricing">Plans</a>
-          <a class="nav-link" href="/profile">Profile</a>
-          <a class="nav-link" href="/settings">Settings</a>
-          <a class="nav-link" href="/admin">Admin</a>
+          <p class="nav-title" data-i18n="nav.workspace">Workspace</p>
+          <a class="nav-link" href="/dashboard" data-i18n="nav.dashboard">Dashboard</a>
+          <a class="nav-link" href="/analytics" data-i18n="nav.analytics">Analytics</a>
+          <a class="nav-link" href="/pricing" data-i18n="nav.plans">Plans</a>
+          <a class="nav-link" href="/profile" data-i18n="nav.profile">Profile</a>
+          <a class="nav-link" href="/settings" data-i18n="nav.settings">Settings</a>
+          <a class="nav-link" href="/admin" data-i18n="nav.admin">Admin</a>
         </div>
         <div class="nav-group">
-          <p class="nav-title">Domains</p>
+          <p class="nav-title" data-i18n="nav.domains">Domains</p>
           {% for item in domains %}
-            <a class="nav-link" href="/dashboard/{{ item.id }}">{{ item.name }}</a>
+            <a class="nav-link" href="/dashboard/{{ item.id }}" data-i18n="domain.{{ item.id }}.name">{{ item.name }}</a>
           {% endfor %}
         </div>
       </aside>
       <main class="main">
         <div class="topbar">
           <div></div>
-          <div>
+          <div class="topbar-actions">
+            <label class="language-label" for="global-language" data-i18n="topbar.language">Language</label>
+            <select id="global-language" class="global-language-select">
+              {% for language in languages %}
+                <option value="{{ language.code }}">{{ language.name }}</option>
+              {% endfor %}
+            </select>
             {% if user %}
               <span class="muted">{{ user.email }}</span>
               <a class="button secondary" href="/logout">Logout</a>
@@ -45,5 +51,490 @@
         {% block content %}{% endblock %}
       </main>
     </div>
+
+    {% if user %}
+    <!-- Floating Voice Assistant Widget -->
+    <div class="voice-assistant-container" id="voice-assistant">
+      <div class="voice-panel" id="voice-panel">
+        <div class="voice-header">
+          <h3>🎙️ AgroMind Voice Assistant</h3>
+          <button class="voice-close-btn" onclick="toggleVoicePanel(event)">✕</button>
+        </div>
+        <div class="voice-body" id="voice-chat-history">
+          <div class="voice-msg assistant">
+            Hello! I am your AgroMind voice assistant. Click the microphone below and speak to ask me anything.
+          </div>
+        </div>
+        <div class="voice-footer">
+          <div class="voice-visualizer" id="voice-visualizer">
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+          </div>
+          <span class="voice-status-text" id="voice-status">Idle</span>
+          <button class="voice-trigger-btn" id="voice-mic-btn" onclick="toggleVoiceCapture(event)">🎙️</button>
+        </div>
+      </div>
+      <button class="voice-trigger-btn" id="voice-panel-trigger" onclick="toggleVoicePanel(event)" title="Talk to AgroMind">
+        🎙️
+      </button>
+    </div>
+    {% endif %}
+
+    <script>
+      // Global CSRF Token
+      const globalCsrfToken = "{{ csrf_token }}";
+
+      // Check Speech Recognition Support
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const isSpeechSupported = !!SpeechRecognition;
+      const languageStorageKey = "agromind.language";
+      const translations = {
+        "en-US": {
+          "brand.subtitle": "founded by surya",
+          "nav.workspace": "Workspace", "nav.dashboard": "Dashboard", "nav.analytics": "Analytics", "nav.plans": "Plans", "nav.profile": "Profile", "nav.settings": "Settings", "nav.admin": "Admin", "nav.domains": "Domains", "topbar.language": "Language",
+          "home.badge": "Supabase + AI workflows", "home.title": "AgroMind AI", "home.subtitle": "A multi-domain decision support platform for agriculture, healthcare, and education workflows.", "home.openDashboard": "Open Dashboard",
+          "dashboard.title": "Dashboard", "dashboard.subtitle": "Search, launch tools, monitor usage, and review recent AI outputs.", "dashboard.toolsAvailable": "Tools available", "dashboard.acrossDomains": "Across 3 AI domains", "dashboard.apiUsage": "API usage", "dashboard.tokensToday": "Tokens used today", "dashboard.reports": "Reports", "dashboard.generatedMonth": "Generated this month", "dashboard.plan": "Plan", "dashboard.daysRemaining": "18 days remaining", "dashboard.recentOutputs": "Recent Outputs", "dashboard.noOutputs": "No saved outputs yet. Run any AI tool to create history.",
+          "domain.agriculture.short": "Agri AI", "domain.agriculture.name": "Agriculture AI", "domain.agriculture.tagline": "Smarter decisions from seed to harvest.", "domain.agriculture.description": "Crop planning, plant inspection, farm operations, learning guides, and market intelligence for modern growers.",
+          "domain.healthcare.short": "Health AI", "domain.healthcare.name": "Healthcare AI", "domain.healthcare.tagline": "Clear health guidance with safety first.", "domain.healthcare.description": "Symptom triage, image-assisted skin analysis, report explanations, wellness coaching, and medicine safety support.",
+          "domain.education.short": "Edu AI", "domain.education.name": "Education AI", "domain.education.tagline": "Create learning materials in minutes.", "domain.education.description": "Notes, worksheets, MCQs, presentations, tutoring, grading, and YouTube study tools for teachers and learners."
+        },
+        "hi-IN": {
+          "brand.subtitle": "surya द्वारा स्थापित",
+          "nav.workspace": "कार्यस्थान", "nav.dashboard": "डैशबोर्ड", "nav.analytics": "विश्लेषण", "nav.plans": "योजनाएं", "nav.profile": "प्रोफाइल", "nav.settings": "सेटिंग्स", "nav.admin": "एडमिन", "nav.domains": "क्षेत्र", "topbar.language": "भाषा",
+          "home.badge": "Supabase + AI वर्कफ्लो", "home.title": "AgroMind AI", "home.subtitle": "कृषि, स्वास्थ्य और शिक्षा वर्कफ्लो के लिए बहु-क्षेत्रीय निर्णय सहायता प्लेटफॉर्म।", "home.openDashboard": "डैशबोर्ड खोलें",
+          "dashboard.title": "डैशबोर्ड", "dashboard.subtitle": "टूल खोजें, शुरू करें, उपयोग देखें और हाल के AI आउटपुट की समीक्षा करें।", "dashboard.toolsAvailable": "उपलब्ध टूल", "dashboard.acrossDomains": "3 AI क्षेत्रों में", "dashboard.apiUsage": "API उपयोग", "dashboard.tokensToday": "आज उपयोग हुए टोकन", "dashboard.reports": "रिपोर्ट", "dashboard.generatedMonth": "इस महीने बनाई गई", "dashboard.plan": "प्लान", "dashboard.daysRemaining": "18 दिन शेष", "dashboard.recentOutputs": "हाल के आउटपुट", "dashboard.noOutputs": "अभी कोई आउटपुट सेव नहीं है। इतिहास बनाने के लिए कोई AI टूल चलाएं।",
+          "domain.agriculture.short": "कृषि AI", "domain.agriculture.name": "कृषि AI", "domain.agriculture.tagline": "बीज से कटाई तक बेहतर निर्णय।", "domain.agriculture.description": "आधुनिक किसानों के लिए फसल योजना, पौध निरीक्षण, फार्म संचालन, सीखने की गाइड और बाजार जानकारी।",
+          "domain.healthcare.short": "स्वास्थ्य AI", "domain.healthcare.name": "स्वास्थ्य AI", "domain.healthcare.tagline": "सुरक्षा के साथ स्पष्ट स्वास्थ्य मार्गदर्शन।", "domain.healthcare.description": "लक्षण जांच, चित्र आधारित त्वचा विश्लेषण, रिपोर्ट समझाना, वेलनेस कोचिंग और दवा सुरक्षा सहायता।",
+          "domain.education.short": "शिक्षा AI", "domain.education.name": "शिक्षा AI", "domain.education.tagline": "मिनटों में सीखने की सामग्री बनाएं।", "domain.education.description": "शिक्षकों और विद्यार्थियों के लिए नोट्स, वर्कशीट, MCQ, प्रस्तुति, ट्यूशन, ग्रेडिंग और YouTube अध्ययन टूल।"
+        },
+        "es-ES": {
+          "brand.subtitle": "fundado por surya",
+          "nav.workspace": "Espacio", "nav.dashboard": "Panel", "nav.analytics": "Analitica", "nav.plans": "Planes", "nav.profile": "Perfil", "nav.settings": "Ajustes", "nav.admin": "Admin", "nav.domains": "Dominios", "topbar.language": "Idioma",
+          "home.badge": "Flujos Supabase + AI", "home.title": "AgroMind AI", "home.subtitle": "Plataforma de apoyo a decisiones para agricultura, salud y educacion.", "home.openDashboard": "Abrir panel",
+          "dashboard.title": "Panel", "dashboard.subtitle": "Busca herramientas, lanzalas, revisa uso y salidas recientes de AI.", "dashboard.toolsAvailable": "Herramientas", "dashboard.acrossDomains": "En 3 dominios AI", "dashboard.apiUsage": "Uso API", "dashboard.tokensToday": "Tokens usados hoy", "dashboard.reports": "Informes", "dashboard.generatedMonth": "Generados este mes", "dashboard.plan": "Plan", "dashboard.daysRemaining": "Quedan 18 dias", "dashboard.recentOutputs": "Salidas recientes", "dashboard.noOutputs": "Aun no hay salidas guardadas. Ejecuta una herramienta AI para crear historial.",
+          "domain.agriculture.short": "Agri AI", "domain.agriculture.name": "AI Agricola", "domain.agriculture.tagline": "Mejores decisiones de la semilla a la cosecha.", "domain.agriculture.description": "Planificacion de cultivos, inspeccion de plantas, operaciones agricolas, guias y mercado.",
+          "domain.healthcare.short": "Salud AI", "domain.healthcare.name": "AI de Salud", "domain.healthcare.tagline": "Guia clara de salud con seguridad primero.", "domain.healthcare.description": "Triage de sintomas, analisis de piel por imagen, explicacion de informes, bienestar y seguridad de medicamentos.",
+          "domain.education.short": "Edu AI", "domain.education.name": "AI Educativa", "domain.education.tagline": "Crea materiales de aprendizaje en minutos.", "domain.education.description": "Notas, hojas, MCQ, presentaciones, tutorias, evaluacion y herramientas de estudio de YouTube."
+        },
+        "fr-FR": {
+          "brand.subtitle": "fonde par surya",
+          "nav.workspace": "Espace", "nav.dashboard": "Tableau", "nav.analytics": "Analyse", "nav.plans": "Plans", "nav.profile": "Profil", "nav.settings": "Reglages", "nav.admin": "Admin", "nav.domains": "Domaines", "topbar.language": "Langue",
+          "home.badge": "Workflows Supabase + AI", "home.title": "AgroMind AI", "home.subtitle": "Plateforme d'aide a la decision pour agriculture, sante et education.", "home.openDashboard": "Ouvrir le tableau",
+          "dashboard.title": "Tableau", "dashboard.subtitle": "Recherchez des outils, lancez-les, suivez l'usage et les sorties AI recentes.", "dashboard.toolsAvailable": "Outils disponibles", "dashboard.acrossDomains": "Dans 3 domaines AI", "dashboard.apiUsage": "Usage API", "dashboard.tokensToday": "Tokens utilises aujourd'hui", "dashboard.reports": "Rapports", "dashboard.generatedMonth": "Generes ce mois-ci", "dashboard.plan": "Plan", "dashboard.daysRemaining": "18 jours restants", "dashboard.recentOutputs": "Sorties recentes", "dashboard.noOutputs": "Aucune sortie enregistree. Lancez un outil AI pour creer l'historique.",
+          "domain.agriculture.short": "Agri AI", "domain.agriculture.name": "AI Agriculture", "domain.agriculture.tagline": "De meilleures decisions de la graine a la recolte.", "domain.agriculture.description": "Planification, inspection des plantes, operations, guides et intelligence marche.",
+          "domain.healthcare.short": "Sante AI", "domain.healthcare.name": "AI Sante", "domain.healthcare.tagline": "Conseils de sante clairs et prudents.", "domain.healthcare.description": "Triage des symptomes, analyse cutanee par image, rapports, bien-etre et securite medicamenteuse.",
+          "domain.education.short": "Edu AI", "domain.education.name": "AI Education", "domain.education.tagline": "Creez des supports d'apprentissage en minutes.", "domain.education.description": "Notes, fiches, QCM, presentations, tutorat, correction et outils YouTube."
+        }
+      };
+      translations["ar-SA"] = {
+        "brand.subtitle": "أسسه surya",
+        "nav.workspace": "مساحة العمل", "nav.dashboard": "لوحة التحكم", "nav.analytics": "التحليلات", "nav.plans": "الخطط", "nav.profile": "الملف", "nav.settings": "الإعدادات", "nav.admin": "المسؤول", "nav.domains": "المجالات", "topbar.language": "اللغة",
+        "home.badge": "تدفقات Supabase + AI", "home.title": "AgroMind AI", "home.subtitle": "منصة دعم قرار للزراعة والرعاية الصحية والتعليم.", "home.openDashboard": "فتح اللوحة",
+        "dashboard.title": "لوحة التحكم", "dashboard.subtitle": "ابحث عن الأدوات وشغلها وراقب الاستخدام وراجع مخرجات AI الأخيرة.", "dashboard.toolsAvailable": "الأدوات المتاحة", "dashboard.acrossDomains": "ضمن 3 مجالات AI", "dashboard.apiUsage": "استخدام API", "dashboard.tokensToday": "الرموز المستخدمة اليوم", "dashboard.reports": "التقارير", "dashboard.generatedMonth": "تم إنشاؤها هذا الشهر", "dashboard.plan": "الخطة", "dashboard.daysRemaining": "18 يوما متبقية", "dashboard.recentOutputs": "المخرجات الأخيرة", "dashboard.noOutputs": "لا توجد مخرجات محفوظة بعد. شغل أي أداة AI لإنشاء سجل.",
+        "domain.agriculture.short": "زراعة AI", "domain.agriculture.name": "AI للزراعة", "domain.agriculture.tagline": "قرارات أذكى من البذور إلى الحصاد.", "domain.agriculture.description": "تخطيط المحاصيل وفحص النباتات وإدارة المزرعة والأدلة ومعلومات السوق.",
+        "domain.healthcare.short": "صحة AI", "domain.healthcare.name": "AI للرعاية الصحية", "domain.healthcare.tagline": "إرشاد صحي واضح مع السلامة أولا.", "domain.healthcare.description": "فرز الأعراض وتحليل الجلد بالصور وشرح التقارير والعافية وسلامة الأدوية.",
+        "domain.education.short": "تعليم AI", "domain.education.name": "AI للتعليم", "domain.education.tagline": "أنشئ مواد تعليمية في دقائق.", "domain.education.description": "ملاحظات وأوراق عمل وأسئلة وعروض وتدريس وتقييم وأدوات YouTube."
+      };
+      translations["pt-BR"] = {
+        "brand.subtitle": "fundado por surya",
+        "nav.workspace": "Espaco", "nav.dashboard": "Painel", "nav.analytics": "Analises", "nav.plans": "Planos", "nav.profile": "Perfil", "nav.settings": "Configuracoes", "nav.admin": "Admin", "nav.domains": "Dominios", "topbar.language": "Idioma",
+        "home.badge": "Fluxos Supabase + AI", "home.title": "AgroMind AI", "home.subtitle": "Plataforma de apoio a decisao para agricultura, saude e educacao.", "home.openDashboard": "Abrir painel",
+        "dashboard.title": "Painel", "dashboard.subtitle": "Pesquise ferramentas, execute, monitore uso e revise saidas recentes de AI.", "dashboard.toolsAvailable": "Ferramentas", "dashboard.acrossDomains": "Em 3 dominios AI", "dashboard.apiUsage": "Uso da API", "dashboard.tokensToday": "Tokens usados hoje", "dashboard.reports": "Relatorios", "dashboard.generatedMonth": "Gerados este mes", "dashboard.plan": "Plano", "dashboard.daysRemaining": "18 dias restantes", "dashboard.recentOutputs": "Saidas recentes", "dashboard.noOutputs": "Nenhuma saida salva ainda. Execute uma ferramenta AI para criar historico.",
+        "domain.agriculture.short": "Agri AI", "domain.agriculture.name": "AI Agricola", "domain.agriculture.tagline": "Decisoes melhores da semente a colheita.", "domain.agriculture.description": "Planejamento de culturas, inspecao de plantas, operacoes, guias e mercado.",
+        "domain.healthcare.short": "Saude AI", "domain.healthcare.name": "AI de Saude", "domain.healthcare.tagline": "Orientacao clara com seguranca primeiro.", "domain.healthcare.description": "Triagem de sintomas, analise de pele por imagem, relatorios, bem-estar e medicamentos.",
+        "domain.education.short": "Edu AI", "domain.education.name": "AI Educacional", "domain.education.tagline": "Crie materiais de aprendizagem em minutos.", "domain.education.description": "Notas, atividades, MCQs, apresentacoes, tutoria, avaliacao e YouTube."
+      };
+      translations["de-DE"] = {
+        "brand.subtitle": "gegrundet von surya",
+        "nav.workspace": "Arbeitsbereich", "nav.dashboard": "Dashboard", "nav.analytics": "Analysen", "nav.plans": "Plane", "nav.profile": "Profil", "nav.settings": "Einstellungen", "nav.admin": "Admin", "nav.domains": "Bereiche", "topbar.language": "Sprache",
+        "home.badge": "Supabase + AI Workflows", "home.title": "AgroMind AI", "home.subtitle": "Entscheidungshilfe fur Landwirtschaft, Gesundheit und Bildung.", "home.openDashboard": "Dashboard offnen",
+        "dashboard.title": "Dashboard", "dashboard.subtitle": "Tools suchen, starten, Nutzung beobachten und neue AI Ausgaben prufen.", "dashboard.toolsAvailable": "Verfugbare Tools", "dashboard.acrossDomains": "In 3 AI Bereichen", "dashboard.apiUsage": "API Nutzung", "dashboard.tokensToday": "Heute genutzte Tokens", "dashboard.reports": "Berichte", "dashboard.generatedMonth": "Diesen Monat erstellt", "dashboard.plan": "Plan", "dashboard.daysRemaining": "18 Tage ubrig", "dashboard.recentOutputs": "Neue Ausgaben", "dashboard.noOutputs": "Noch keine Ausgaben gespeichert. Starte ein AI Tool, um Verlauf zu erstellen.",
+        "domain.agriculture.short": "Agri AI", "domain.agriculture.name": "Landwirtschaft AI", "domain.agriculture.tagline": "Klugere Entscheidungen vom Samen bis zur Ernte.", "domain.agriculture.description": "Anbauplanung, Pflanzenprufung, Hofbetrieb, Lernhilfen und Marktinformationen.",
+        "domain.healthcare.short": "Gesundheit AI", "domain.healthcare.name": "Gesundheits AI", "domain.healthcare.tagline": "Klare Gesundheitsberatung mit Sicherheit zuerst.", "domain.healthcare.description": "Symptomtriage, Bildanalyse der Haut, Berichtserklarung, Wellness und Arzneisicherheit.",
+        "domain.education.short": "Bildung AI", "domain.education.name": "Bildungs AI", "domain.education.tagline": "Lernmaterialien in Minuten erstellen.", "domain.education.description": "Notizen, Arbeitsblatter, MCQs, Prasentationen, Nachhilfe, Bewertung und YouTube Lernhilfen."
+      };
+      translations["it-IT"] = {
+        "brand.subtitle": "fondato da surya",
+        "nav.workspace": "Area lavoro", "nav.dashboard": "Dashboard", "nav.analytics": "Analisi", "nav.plans": "Piani", "nav.profile": "Profilo", "nav.settings": "Impostazioni", "nav.admin": "Admin", "nav.domains": "Domini", "topbar.language": "Lingua",
+        "home.badge": "Flussi Supabase + AI", "home.title": "AgroMind AI", "home.subtitle": "Piattaforma di supporto decisionale per agricoltura, salute e istruzione.", "home.openDashboard": "Apri dashboard",
+        "dashboard.title": "Dashboard", "dashboard.subtitle": "Cerca strumenti, avviali, monitora l'uso e rivedi le uscite AI recenti.", "dashboard.toolsAvailable": "Strumenti", "dashboard.acrossDomains": "In 3 domini AI", "dashboard.apiUsage": "Uso API", "dashboard.tokensToday": "Token usati oggi", "dashboard.reports": "Report", "dashboard.generatedMonth": "Generati questo mese", "dashboard.plan": "Piano", "dashboard.daysRemaining": "18 giorni restanti", "dashboard.recentOutputs": "Uscite recenti", "dashboard.noOutputs": "Nessuna uscita salvata. Avvia uno strumento AI per creare cronologia.",
+        "domain.agriculture.short": "Agri AI", "domain.agriculture.name": "AI Agricoltura", "domain.agriculture.tagline": "Decisioni piu intelligenti dal seme al raccolto.", "domain.agriculture.description": "Pianificazione colture, ispezione piante, operazioni agricole, guide e mercato.",
+        "domain.healthcare.short": "Salute AI", "domain.healthcare.name": "AI Sanita", "domain.healthcare.tagline": "Guida sanitaria chiara con sicurezza prima.", "domain.healthcare.description": "Triage sintomi, analisi pelle da immagini, report, benessere e sicurezza farmaci.",
+        "domain.education.short": "Edu AI", "domain.education.name": "AI Istruzione", "domain.education.tagline": "Crea materiali didattici in minuti.", "domain.education.description": "Note, schede, MCQ, presentazioni, tutoraggio, valutazione e strumenti YouTube."
+      };
+      translations["ja-JP"] = {
+        "brand.subtitle": "surya が創設",
+        "nav.workspace": "ワークスペース", "nav.dashboard": "ダッシュボード", "nav.analytics": "分析", "nav.plans": "プラン", "nav.profile": "プロフィール", "nav.settings": "設定", "nav.admin": "管理", "nav.domains": "分野", "topbar.language": "言語",
+        "home.badge": "Supabase + AI ワークフロー", "home.title": "AgroMind AI", "home.subtitle": "農業、医療、教育のための意思決定支援プラットフォーム。", "home.openDashboard": "ダッシュボードを開く",
+        "dashboard.title": "ダッシュボード", "dashboard.subtitle": "ツールを検索、実行し、利用状況と最近のAI出力を確認します。", "dashboard.toolsAvailable": "利用可能なツール", "dashboard.acrossDomains": "3つのAI分野", "dashboard.apiUsage": "API利用", "dashboard.tokensToday": "本日使用したトークン", "dashboard.reports": "レポート", "dashboard.generatedMonth": "今月作成", "dashboard.plan": "プラン", "dashboard.daysRemaining": "残り18日", "dashboard.recentOutputs": "最近の出力", "dashboard.noOutputs": "保存された出力はまだありません。AIツールを実行して履歴を作成してください。",
+        "domain.agriculture.short": "農業AI", "domain.agriculture.name": "農業AI", "domain.agriculture.tagline": "種まきから収穫まで賢い判断を。", "domain.agriculture.description": "作物計画、植物検査、農場運営、学習ガイド、市場情報を支援します。",
+        "domain.healthcare.short": "医療AI", "domain.healthcare.name": "医療AI", "domain.healthcare.tagline": "安全第一のわかりやすい健康ガイド。", "domain.healthcare.description": "症状トリアージ、画像による皮膚分析、検査レポート説明、健康管理、薬の安全支援。",
+        "domain.education.short": "教育AI", "domain.education.name": "教育AI", "domain.education.tagline": "学習資料を数分で作成。", "domain.education.description": "ノート、ワークシート、MCQ、発表資料、個別指導、採点、YouTube学習ツール。"
+      };
+      translations["ko-KR"] = {
+        "brand.subtitle": "surya 설립",
+        "nav.workspace": "작업공간", "nav.dashboard": "대시보드", "nav.analytics": "분석", "nav.plans": "요금제", "nav.profile": "프로필", "nav.settings": "설정", "nav.admin": "관리", "nav.domains": "도메인", "topbar.language": "언어",
+        "home.badge": "Supabase + AI 워크플로", "home.title": "AgroMind AI", "home.subtitle": "농업, 의료, 교육을 위한 의사결정 지원 플랫폼입니다.", "home.openDashboard": "대시보드 열기",
+        "dashboard.title": "대시보드", "dashboard.subtitle": "도구를 검색하고 실행하며 사용량과 최근 AI 출력을 확인하세요.", "dashboard.toolsAvailable": "사용 가능한 도구", "dashboard.acrossDomains": "3개 AI 도메인", "dashboard.apiUsage": "API 사용량", "dashboard.tokensToday": "오늘 사용한 토큰", "dashboard.reports": "보고서", "dashboard.generatedMonth": "이번 달 생성", "dashboard.plan": "플랜", "dashboard.daysRemaining": "18일 남음", "dashboard.recentOutputs": "최근 출력", "dashboard.noOutputs": "저장된 출력이 없습니다. AI 도구를 실행해 기록을 만드세요.",
+        "domain.agriculture.short": "농업 AI", "domain.agriculture.name": "농업 AI", "domain.agriculture.tagline": "씨앗부터 수확까지 더 똑똑한 결정.", "domain.agriculture.description": "작물 계획, 식물 검사, 농장 운영, 학습 가이드와 시장 정보를 지원합니다.",
+        "domain.healthcare.short": "건강 AI", "domain.healthcare.name": "헬스케어 AI", "domain.healthcare.tagline": "안전을 우선한 명확한 건강 안내.", "domain.healthcare.description": "증상 분류, 이미지 기반 피부 분석, 보고서 설명, 웰니스와 약물 안전 지원.",
+        "domain.education.short": "교육 AI", "domain.education.name": "교육 AI", "domain.education.tagline": "몇 분 안에 학습 자료를 만드세요.", "domain.education.description": "노트, 워크시트, MCQ, 발표자료, 튜터링, 채점, YouTube 학습 도구."
+      };
+
+      function currentLanguage() {
+        const selector = document.getElementById("global-language");
+        return selector ? selector.value : "{{ default_language }}";
+      }
+
+      function syncLanguageSelectors(value) {
+        document.documentElement.lang = value;
+        document.querySelectorAll(".language-select, #global-language").forEach(selector => {
+          selector.value = value;
+        });
+        const pack = translations[value] || translations["en-US"];
+        document.querySelectorAll("[data-i18n]").forEach(node => {
+          const text = pack[node.dataset.i18n];
+          if (text) node.textContent = text;
+        });
+        localStorage.setItem(languageStorageKey, value);
+      }
+
+      // --- 1. GLOBAL TEXT-TO-SPEECH (TTS) ENGINE ---
+      let activeUtterance = null;
+      let activeSpeechButton = null;
+
+      function cleanMarkdownAndHtml(text) {
+        let cleaned = text.replace(/<[^>]*>/g, ""); // strip html
+        cleaned = cleaned.replace(/[\#\*\_`\-\+\[\]\(\)\{\}\>\~]/g, " "); // remove markdown symbols
+        cleaned = cleaned.replace(/\s+/g, " ").trim();
+        return cleaned;
+      }
+
+      function speakText(text, btnElement = null, onEndCallback = null, languageOverride = null) {
+        if (!window.speechSynthesis) {
+          alert("Text-to-speech is not supported in this browser.");
+          return;
+        }
+
+        if (activeUtterance) {
+          window.speechSynthesis.cancel();
+          if (activeSpeechButton) {
+            activeSpeechButton.classList.remove('speaking');
+            const icon = activeSpeechButton.querySelector('.speaker-icon');
+            const label = activeSpeechButton.querySelector('.btn-label');
+            if (icon) icon.textContent = '🔊';
+            if (label) label.textContent = 'Listen';
+          }
+          if (activeSpeechButton === btnElement) {
+            activeUtterance = null;
+            activeSpeechButton = null;
+            return;
+          }
+        }
+
+        const cleanedText = cleanMarkdownAndHtml(text);
+        if (!cleanedText) return;
+
+        const utterance = new SpeechSynthesisUtterance(cleanedText);
+        activeUtterance = utterance;
+        activeSpeechButton = btnElement;
+
+        if (btnElement) {
+          btnElement.classList.add('speaking');
+          const icon = btnElement.querySelector('.speaker-icon');
+          const label = btnElement.querySelector('.btn-label');
+          if (icon) icon.textContent = '⏹️';
+          if (label) label.textContent = 'Stop';
+        }
+
+        utterance.onend = () => {
+          if (btnElement) {
+            btnElement.classList.remove('speaking');
+            const icon = btnElement.querySelector('.speaker-icon');
+            const label = btnElement.querySelector('.btn-label');
+            if (icon) icon.textContent = '🔊';
+            if (label) label.textContent = 'Listen';
+          }
+          if (activeSpeechButton === btnElement) {
+            activeUtterance = null;
+            activeSpeechButton = null;
+          }
+          if (onEndCallback) onEndCallback();
+        };
+
+        utterance.onerror = (e) => {
+          console.error("Speech Synthesis Error:", e);
+          if (btnElement) {
+            btnElement.classList.remove('speaking');
+            const icon = btnElement.querySelector('.speaker-icon');
+            const label = btnElement.querySelector('.btn-label');
+            if (icon) icon.textContent = '🔊';
+            if (label) label.textContent = 'Listen';
+          }
+          if (activeSpeechButton === btnElement) {
+            activeUtterance = null;
+            activeSpeechButton = null;
+          }
+          if (onEndCallback) onEndCallback();
+        };
+
+        utterance.lang = languageOverride || currentLanguage();
+        const voices = window.speechSynthesis.getVoices();
+        const langPrefix = utterance.lang.split("-")[0];
+        const defaultVoice = voices.find(v => v.lang === utterance.lang) ||
+                             voices.find(v => v.lang.startsWith(langPrefix)) ||
+                             voices.find(v => v.lang.startsWith('en'));
+        if (defaultVoice) utterance.voice = defaultVoice;
+
+        window.speechSynthesis.speak(utterance);
+      }
+
+      // --- 2. DYNAMIC INPUT FIELD VOICE TYPING (STT) ---
+      document.addEventListener("DOMContentLoaded", () => {
+        const savedLanguage = localStorage.getItem(languageStorageKey) || "{{ default_language }}";
+        syncLanguageSelectors(savedLanguage);
+        document.querySelectorAll(".language-select, #global-language").forEach(selector => {
+          selector.addEventListener("change", () => syncLanguageSelectors(selector.value));
+        });
+
+        if (!isSpeechSupported) {
+          console.log("Speech recognition not supported in this browser.");
+          return;
+        }
+
+        const fields = document.querySelectorAll("textarea, input[type='text']");
+        fields.forEach(field => {
+          if (field.id === "csrf_token" || field.closest('.speech-input-wrapper') || field.name === "email" || field.name === "password" || field.name === "csrf_token") {
+            return;
+          }
+
+          const wrapper = document.createElement("div");
+          wrapper.className = "speech-input-wrapper";
+
+          field.parentNode.insertBefore(wrapper, field);
+          wrapper.appendChild(field);
+
+          const micBtn = document.createElement("button");
+          micBtn.type = "button";
+          micBtn.className = "speech-mic-btn";
+          micBtn.innerHTML = "🎙️";
+          micBtn.title = "Speak to type";
+          wrapper.appendChild(micBtn);
+
+          let recognition = null;
+          let isRecording = false;
+
+          micBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (isRecording) {
+              recognition.stop();
+              return;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = currentLanguage();
+
+            recognition.onstart = () => {
+              isRecording = true;
+              micBtn.classList.add("recording");
+              micBtn.title = "Listening... Click to stop";
+            };
+
+            recognition.onresult = (event) => {
+              const resultText = event.results[0][0].transcript;
+              if (resultText) {
+                const start = field.selectionStart;
+                const end = field.selectionEnd;
+                const value = field.value;
+                field.value = value.substring(0, start) + resultText + value.substring(end);
+                field.selectionStart = field.selectionEnd = start + resultText.length;
+                field.focus();
+                field.dispatchEvent(new Event('input', { bubbles: true }));
+              }
+            };
+
+            recognition.onend = () => {
+              isRecording = false;
+              micBtn.classList.remove("recording");
+              micBtn.title = "Speak to type";
+            };
+
+            recognition.onerror = (err) => {
+              console.error("Speech Recognition Error:", err);
+              isRecording = false;
+              micBtn.classList.remove("recording");
+              micBtn.title = "Speak to type";
+            };
+
+            recognition.start();
+          });
+        });
+      });
+
+      // --- 3. INTERACTIVE FLOATING VOICE ASSISTANT ---
+      let isPanelOpen = false;
+      let isListeningAssistant = false;
+      let assistantRecognition = null;
+
+      function toggleVoicePanel(e) {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        const panel = document.getElementById("voice-panel");
+        const trigger = document.getElementById("voice-panel-trigger");
+        if (!panel) return;
+
+        isPanelOpen = !isPanelOpen;
+        if (isPanelOpen) {
+          panel.classList.add("open");
+          trigger.style.display = "none";
+          scrollAssistantChat();
+        } else {
+          panel.classList.remove("open");
+          trigger.style.display = "flex";
+          if (isListeningAssistant) {
+            stopAssistantListening();
+          }
+          if (window.speechSynthesis && activeUtterance) {
+            window.speechSynthesis.cancel();
+          }
+        }
+      }
+
+      function scrollAssistantChat() {
+        const body = document.getElementById("voice-chat-history");
+        if (body) body.scrollTop = body.scrollHeight;
+      }
+
+      function appendAssistantMessage(text, isUser = false) {
+        const body = document.getElementById("voice-chat-history");
+        if (!body) return;
+        const msg = document.createElement("div");
+        msg.className = `voice-msg ${isUser ? 'user' : 'assistant'}`;
+        msg.textContent = text;
+        body.appendChild(msg);
+        scrollAssistantChat();
+      }
+
+      function stopAssistantListening() {
+        if (assistantRecognition) {
+          assistantRecognition.stop();
+        }
+        isListeningAssistant = false;
+        const micBtn = document.getElementById("voice-mic-btn");
+        const visualizer = document.getElementById("voice-visualizer");
+        const status = document.getElementById("voice-status");
+
+        if (micBtn) micBtn.classList.remove("active");
+        if (visualizer) visualizer.classList.remove("listening");
+        if (status) status.textContent = "Idle";
+      }
+
+      function toggleVoiceCapture(e) {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+
+        if (!isSpeechSupported) {
+          alert("Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.");
+          return;
+        }
+
+        if (isListeningAssistant) {
+          stopAssistantListening();
+          return;
+        }
+
+        if (window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+          const visualizer = document.getElementById("voice-visualizer");
+          if (visualizer) visualizer.classList.remove("speaking");
+        }
+
+        assistantRecognition = new SpeechRecognition();
+        assistantRecognition.continuous = false;
+        assistantRecognition.interimResults = false;
+        assistantRecognition.lang = currentLanguage();
+
+        const micBtn = document.getElementById("voice-mic-btn");
+        const visualizer = document.getElementById("voice-visualizer");
+        const status = document.getElementById("voice-status");
+
+        assistantRecognition.onstart = () => {
+          isListeningAssistant = true;
+          if (micBtn) micBtn.classList.add("active");
+          if (visualizer) visualizer.classList.add("listening");
+          if (status) status.textContent = "Listening...";
+        };
+
+        assistantRecognition.onresult = async (event) => {
+          const queryText = event.results[0][0].transcript;
+          if (!queryText) return;
+
+          appendAssistantMessage(queryText, true);
+          stopAssistantListening();
+
+          if (status) status.textContent = "Processing...";
+          if (visualizer) visualizer.classList.add("listening");
+
+          try {
+            const formData = new FormData();
+            formData.append("query", queryText);
+            formData.append("csrf_token", globalCsrfToken);
+            formData.append("language", currentLanguage());
+
+            const response = await fetch("/api/voice-assistant", {
+              method: "POST",
+              body: formData
+            });
+
+            if (!response.ok) {
+              throw new Error("Network response error");
+            }
+
+            const data = await response.json();
+            const reply = data.response;
+            const replyLanguage = data.language || currentLanguage();
+
+            appendAssistantMessage(reply, false);
+            if (visualizer) visualizer.classList.remove("listening");
+
+            if (status) status.textContent = "Speaking...";
+            if (visualizer) visualizer.classList.add("speaking");
+            speakText(reply, null, () => {
+              if (visualizer) visualizer.classList.remove("speaking");
+              if (status) status.textContent = "Idle";
+            }, replyLanguage);
+          } catch (err) {
+            console.error("Voice Assistant Request Failed:", err);
+            appendAssistantMessage("Sorry, I had trouble reaching the AI. Please try again.", false);
+            if (visualizer) visualizer.classList.remove("listening");
+            if (status) status.textContent = "Idle";
+          }
+        };
+
+        assistantRecognition.onerror = (err) => {
+          console.error("Assistant Speech Error:", err);
+          stopAssistantListening();
+        };
+
+        assistantRecognition.onend = () => {
+          if (isListeningAssistant) {
+            stopAssistantListening();
+          }
+        };
+
+        assistantRecognition.start();
+      }
+    </script>
   </body>
 </html>

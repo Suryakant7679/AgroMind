@@ -10,4 +10,9 @@
       <div><label>Plan</label><input value="{{ profile.plan if profile else 'starter' }}"></div>
     </div>
   </div>
+  <div class="grid grid-3" style="margin-top:1rem">
+    <div class="card metric"><span class="muted">Requests today</span><strong>{{ usage.requests_today if usage else 0 }}</strong><span class="muted">Limit {{ current_plan.daily_requests if current_plan else 1000 }}</span></div>
+    <div class="card metric"><span class="muted">Tokens left</span><strong>{{ "{:,}".format((current_plan.monthly_tokens if current_plan else 250000) - (usage.tokens_this_month if usage else 0)) }}</strong><span class="muted">{{ "{:,}".format(usage.tokens_this_month if usage else 0) }} used</span></div>
+    <div class="card metric"><span class="muted">AI credits</span><strong>{{ usage.credits_this_month if usage else 0 }}</strong><span class="muted">{{ current_plan.monthly_credits if current_plan else 0 }} included</span></div>
+  </div>
 {% endblock %}

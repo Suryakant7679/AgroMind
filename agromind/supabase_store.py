@@ -1,4 +1,5 @@
 import os
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from urllib.parse import quote
 
@@ -177,9 +178,12 @@ def save_output(
     fields: dict,
     output: str,
     provider: str,
+    input_tokens: int = 0,
+    credits_used: int = 0,
+    cost_cents: int = 0,
     access_token: str | None = None,
 ) -> None:
-    tokens_used = max(1, len(output) // 4)
+    tokens_used = max(1, input_tokens + (len(output) // 4))
     output_row = {
         "user_id": user_id,
         "domain": domain_id,
@@ -194,6 +198,8 @@ def save_output(
         "tool": tool_id,
         "provider": provider,
         "tokens_used": tokens_used,
+        "credits_used": credits_used,
+        "cost_cents": cost_cents,
     }
     client = supabase_client()
     if client:
@@ -236,6 +242,86 @@ def fetch_recent_outputs(user_id: str | None = None, limit: int = 5, access_toke
         return response.json() if response.status_code < 400 else []
     except Exception:
         return []
+
+
+def fetch_usage_events(user_id: str | None, access_token: str | None = None, limit: int = 1000) -> list[dict]:
+    if not user_id:
+        return []
+    client = supabase_client()
+    if client:
+        try:
+            return (
+                client.table("usage_events")
+                .select("*")
+                .eq("user_id", user_id)
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+                .data
+                or []
+            )
+        except Exception:
+            pass
+
+    key = _database_key()
+    if not key:
+        return []
+    params = f"select=*&user_id=eq.{quote(user_id)}&order=created_at.desc&limit={limit}"
+    try:
+        response = httpx.get(_rest_url("usage_events", params), headers=_rest_headers(key, access_token), timeout=20)
+        return response.json() if response.status_code < 400 else []
+    except Exception:
+        return []
+
+
+def usage_summary(user_id: str | None, access_token: str | None = None) -> dict:
+    events = fetch_usage_events(user_id, access_token)
+    now = datetime.now(UTC)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    summary = {
+        "requests_today": 0,
+        "requests_this_month": 0,
+        "tokens_this_month": 0,
+        "credits_this_month": 0,
+        "cost_cents_this_month": 0,
+        "domain_rows": {},
+        "provider_rows": {},
+    }
+
+    for event in events:
+        created = _parse_time(event.get("created_at"))
+        if not created or created < month_start:
+            continue
+        tokens = int(event.get("tokens_used") or 0)
+        credits = int(event.get("credits_used") or 0)
+        cost_cents = int(event.get("cost_cents") or 0)
+        domain = event.get("domain") or "unknown"
+        provider = event.get("provider") or "unknown"
+        summary["requests_this_month"] += 1
+        summary["tokens_this_month"] += tokens
+        summary["credits_this_month"] += credits
+        summary["cost_cents_this_month"] += cost_cents
+        summary["domain_rows"].setdefault(domain, {"requests": 0, "tokens": 0, "credits": 0})
+        summary["domain_rows"][domain]["requests"] += 1
+        summary["domain_rows"][domain]["tokens"] += tokens
+        summary["domain_rows"][domain]["credits"] += credits
+        summary["provider_rows"].setdefault(provider, {"requests": 0, "tokens": 0, "credits": 0})
+        summary["provider_rows"][provider]["requests"] += 1
+        summary["provider_rows"][provider]["tokens"] += tokens
+        summary["provider_rows"][provider]["credits"] += credits
+        if created >= day_start:
+            summary["requests_today"] += 1
+    return summary
+
+
+def _parse_time(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
+    except Exception:
+        return None
 
 
 def fetch_profile(user_id: str | None, access_token: str | None = None) -> dict | None:
@@ -282,3 +368,83 @@ def fetch_profiles(limit: int = 25) -> list[dict]:
         return response.json() if response.status_code < 400 else []
     except Exception:
         return []
+
+
+def update_profile_plan(user_id: str | None, plan: str, access_token: str | None = None) -> None:
+    if not user_id:
+        return
+    row = {"plan": plan, "updated_at": datetime.now(UTC).isoformat()}
+    client = supabase_client()
+    if client:
+        try:
+            client.table("profiles").update(row).eq("id", user_id).execute()
+            return
+        except Exception:
+            pass
+    key = _database_key()
+    if not key:
+        return
+    try:
+        httpx.patch(_rest_url("profiles", f"id=eq.{quote(user_id)}"), headers=_rest_headers(key, access_token), json=row, timeout=20)
+    except Exception:
+        pass
+
+
+def save_payment(
+    user_id: str | None,
+    plan: str,
+    amount_paise: int,
+    provider_order_id: str,
+    provider_payment_id: str = "",
+    status: str = "created",
+) -> None:
+    if not user_id:
+        return
+    row = {
+        "user_id": user_id,
+        "plan": plan,
+        "amount_paise": amount_paise,
+        "provider": "razorpay",
+        "provider_order_id": provider_order_id,
+        "provider_payment_id": provider_payment_id,
+        "status": status,
+    }
+    client = supabase_client()
+    if client:
+        try:
+            client.table("payments").insert(row).execute()
+            return
+        except Exception:
+            pass
+    key = _database_key()
+    if not key:
+        return
+    try:
+        httpx.post(_rest_url("payments"), headers=_rest_headers(key), json=row, timeout=20)
+    except Exception:
+        pass
+
+
+def save_subscription(user_id: str | None, plan: str, access_token: str | None = None) -> None:
+    if not user_id:
+        return
+    row = {
+        "user_id": user_id,
+        "plan": plan,
+        "status": "active",
+        "current_period_end": (datetime.now(UTC) + timedelta(days=30)).isoformat(),
+    }
+    client = supabase_client()
+    if client:
+        try:
+            client.table("subscriptions").insert(row).execute()
+            return
+        except Exception:
+            pass
+    key = _database_key()
+    if not key:
+        return
+    try:
+        httpx.post(_rest_url("subscriptions"), headers=_rest_headers(key, access_token), json=row, timeout=20)
+    except Exception:
+        pass

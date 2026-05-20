@@ -1,20 +1,35 @@
 {% extends "base.html" %}
 {% block content %}
   <h1 class="page-title">Analytics</h1>
-  <p class="muted">Usage tracking, domain activity, and subscription intelligence.</p>
+  <p class="muted">Real usage tracking, model activity, and subscription intelligence.</p>
   <div class="grid grid-4" style="margin:1rem 0">
-    <div class="card metric"><span class="muted">Monthly requests</span><strong>3.8k</strong><span class="muted">+18% from last month</span></div>
-    <div class="card metric"><span class="muted">Active users</span><strong>412</strong><span class="muted">Across all workspaces</span></div>
-    <div class="card metric"><span class="muted">Avg latency</span><strong>1.9s</strong><span class="muted">Provider responses</span></div>
-    <div class="card metric"><span class="muted">Success rate</span><strong>99.1%</strong><span class="muted">API route health</span></div>
+    <div class="card metric"><span class="muted">Monthly requests</span><strong>{{ usage.requests_this_month if usage else 0 }}</strong><span class="muted">{{ current_plan.daily_requests if current_plan else 1000 }}/day limit</span></div>
+    <div class="card metric"><span class="muted">Tokens used</span><strong>{{ "{:,}".format(usage.tokens_this_month if usage else 0) }}</strong><span class="muted">{{ "{:,}".format(current_plan.monthly_tokens if current_plan else 250000) }} monthly limit</span></div>
+    <div class="card metric"><span class="muted">Credits used</span><strong>{{ usage.credits_this_month if usage else 0 }}</strong><span class="muted">{{ current_plan.monthly_credits if current_plan else 0 }} included credits</span></div>
+    <div class="card metric"><span class="muted">Current plan</span><strong>{{ current_plan.name if current_plan else "Starter" }}</strong><span class="muted">{{ current_plan.model_access if current_plan else "" }}</span></div>
   </div>
   <div class="card table-wrap">
-    <h2>Domain Performance</h2>
+    <h2>Domain Usage</h2>
     <table>
-      <thead><tr><th>Domain</th><th>Requests</th><th>Export rate</th><th>Top tool</th></tr></thead>
+      <thead><tr><th>Domain</th><th>Requests</th><th>Tokens</th><th>Credits</th></tr></thead>
       <tbody>
         {% for row in rows %}
-          <tr><td>{{ row[0] }}</td><td>{{ row[1] }}</td><td>{{ row[2] }}</td><td>{{ row[3] }}</td></tr>
+          <tr><td>{{ row.domain }}</td><td>{{ row.requests }}</td><td>{{ "{:,}".format(row.tokens) }}</td><td>{{ row.credits }}</td></tr>
+        {% else %}
+          <tr><td colspan="4" class="muted">No usage yet. Run an AI tool to populate analytics.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card table-wrap" style="margin-top:1rem">
+    <h2>Model / Provider Usage</h2>
+    <table>
+      <thead><tr><th>Model</th><th>Requests</th><th>Tokens</th><th>Credits</th></tr></thead>
+      <tbody>
+        {% for row in provider_rows %}
+          <tr><td><code>{{ row.provider }}</code></td><td>{{ row.requests }}</td><td>{{ "{:,}".format(row.tokens) }}</td><td>{{ row.credits }}</td></tr>
+        {% else %}
+          <tr><td colspan="4" class="muted">No model usage recorded yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>

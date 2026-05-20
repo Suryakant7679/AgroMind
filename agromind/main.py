@@ -1,4 +1,7 @@
 import io
+import base64
+import hashlib
+import hmac
 import os
 import secrets
 from pathlib import Path
@@ -15,18 +18,32 @@ from pptx.util import Inches, Pt
 from starlette.middleware.sessions import SessionMiddleware
 
 from agromind.ai import AIProviderError, generate_ai_response
+from agromind.billing import all_plans, can_use_plan, estimate_cost, estimate_prompt_tokens, get_plan
 from agromind.data import DOMAINS, all_tools, get_domain, get_tool
+from agromind.models import (
+    DEFAULT_LANGUAGE,
+    default_groq_model,
+    get_language,
+    groq_model_groups,
+    groq_tts_model_for_language,
+    language_options,
+    resolve_response_language,
+)
 from agromind.supabase_store import (
     fetch_profile,
     fetch_profiles,
     fetch_recent_outputs,
     insert_profile_if_missing,
+    save_payment,
     save_output,
+    save_subscription,
     sign_in_with_password,
     sign_up_with_password,
     supabase_auth_configured,
     supabase_client,
     supabase_database_configured,
+    update_profile_plan,
+    usage_summary,
 )
 
 load_dotenv(".env.local")
@@ -91,7 +108,17 @@ def require_admin(request: Request) -> tuple[dict, dict] | RedirectResponse:
 
 
 def page(request: Request, template: str, **context):
-    base = {"request": request, "domains": DOMAINS, "user": user_from_session(request), "csrf_token": csrf_token(request)}
+    base = {
+        "request": request,
+        "domains": DOMAINS,
+        "user": user_from_session(request),
+        "csrf_token": csrf_token(request),
+        "languages": language_options(),
+        "default_language": DEFAULT_LANGUAGE,
+        "groq_models": groq_model_groups(),
+        "plans": all_plans(),
+        "razorpay_key_id": os.getenv("RAZORPAY_KEY_ID", ""),
+    }
     base.update(context)
     return templates.TemplateResponse(request, template, base)
 
@@ -107,7 +134,10 @@ def dashboard(request: Request):
     if isinstance(user_or_response, RedirectResponse):
         return user_or_response
     recent = fetch_recent_outputs(user_or_response.get("id"), access_token=user_or_response.get("access_token"))
-    return page(request, "dashboard.html", tools=all_tools(), recent=recent)
+    profile_data = fetch_profile(user_or_response.get("id"), user_or_response.get("access_token")) or {}
+    plan = get_plan(profile_data.get("plan", "starter"))
+    usage = usage_summary(user_or_response.get("id"), user_or_response.get("access_token"))
+    return page(request, "dashboard.html", tools=all_tools(), recent=recent, usage=usage, current_plan=plan)
 
 
 @app.get("/dashboard/{domain_id}", response_class=HTMLResponse)
@@ -134,7 +164,13 @@ def tool_page(request: Request, domain_id: str, tool_id: str):
 
 
 @app.post("/dashboard/{domain_id}/{tool_id}", response_class=HTMLResponse)
-async def run_tool(request: Request, domain_id: str, tool_id: str, asset: UploadFile | None = File(default=None)):
+async def run_tool(
+    request: Request,
+    domain_id: str,
+    tool_id: str,
+    asset: UploadFile | None = File(default=None),
+    asset_camera: UploadFile | None = File(default=None),
+):
     user_or_response = require_user(request)
     if isinstance(user_or_response, RedirectResponse):
         return user_or_response
@@ -142,12 +178,34 @@ async def run_tool(request: Request, domain_id: str, tool_id: str, asset: Upload
     tool = get_tool(domain_id, tool_id)
     if not domain or not tool:
         return RedirectResponse("/dashboard", status_code=303)
+    profile_data = fetch_profile(user_or_response.get("id"), user_or_response.get("access_token")) or {}
+    plan_id = profile_data.get("plan", "starter")
+    current_usage = usage_summary(user_or_response.get("id"), user_or_response.get("access_token"))
+    allowed, limit_error = can_use_plan(plan_id, current_usage)
+    if not allowed:
+        return page(
+            request,
+            "tool.html",
+            domain=domain,
+            tool=tool,
+            output_html=None,
+            fields={},
+            error=limit_error,
+            response_language=DEFAULT_LANGUAGE,
+            usage=current_usage,
+            current_plan=get_plan(plan_id),
+        )
 
     form = await request.form()
     verify_csrf(request, str(form.get("csrf_token", "")))
     fields = {field["name"]: str(form.get(field["name"], "")) for field in tool["fields"]}
+    language_code = str(form.get("__language", DEFAULT_LANGUAGE))
+    uploaded_asset = asset_camera if asset_camera and asset_camera.filename else asset
     try:
-        output, provider = await generate_ai_response(domain_id, tool_id, fields, asset)
+        input_tokens = estimate_prompt_tokens(fields)
+        output, provider, response_language = await generate_ai_response(domain_id, tool_id, fields, uploaded_asset, language_code, plan_id)
+        output_tokens = max(1, len(output) // 4)
+        billing = estimate_cost(provider, input_tokens, output_tokens)
         save_output(
             user_or_response.get("id"),
             domain_id,
@@ -155,17 +213,31 @@ async def run_tool(request: Request, domain_id: str, tool_id: str, asset: Upload
             fields,
             output,
             provider,
+            input_tokens,
+            billing["credits"],
+            billing["cost_cents"],
             user_or_response.get("access_token"),
         )
         output_html = markdown.markdown(output, extensions=["tables", "fenced_code"])
         error = None
     except AIProviderError as exc:
         output_html = None
+        response_language = language_code
         error = exc.user_message
     except Exception as exc:
         output_html = None
+        response_language = language_code
         error = str(exc)
-    return page(request, "tool.html", domain=domain, tool=tool, output_html=output_html, fields=fields, error=error)
+    return page(
+        request,
+        "tool.html",
+        domain=domain,
+        tool=tool,
+        output_html=output_html,
+        fields=fields,
+        error=error,
+        response_language=response_language,
+    )
 
 
 @app.get("/analytics", response_class=HTMLResponse)
@@ -173,12 +245,23 @@ def analytics(request: Request):
     user_or_response = require_user(request)
     if isinstance(user_or_response, RedirectResponse):
         return user_or_response
+    profile_data = fetch_profile(user_or_response.get("id"), user_or_response.get("access_token")) or {}
+    plan = get_plan(profile_data.get("plan", "starter"))
+    usage = usage_summary(user_or_response.get("id"), user_or_response.get("access_token"))
     rows = [
-        ("Agriculture", "1,284", "42%", "Plant inspections"),
-        ("Healthcare", "932", "31%", "Symptom checks"),
-        ("Education", "1,621", "54%", "MCQ generation"),
+        {
+            "domain": domain,
+            "requests": values["requests"],
+            "tokens": values["tokens"],
+            "credits": values["credits"],
+        }
+        for domain, values in sorted(usage["domain_rows"].items())
     ]
-    return page(request, "analytics.html", rows=rows)
+    provider_rows = [
+        {"provider": provider, **values}
+        for provider, values in sorted(usage["provider_rows"].items())
+    ]
+    return page(request, "analytics.html", rows=rows, provider_rows=provider_rows, usage=usage, current_plan=plan)
 
 
 @app.get("/admin", response_class=HTMLResponse)
@@ -196,7 +279,8 @@ def profile(request: Request):
     if isinstance(user_or_response, RedirectResponse):
         return user_or_response
     profile_data = fetch_profile(user_or_response.get("id"), user_or_response.get("access_token"))
-    return page(request, "profile.html", profile=profile_data)
+    usage = usage_summary(user_or_response.get("id"), user_or_response.get("access_token"))
+    return page(request, "profile.html", profile=profile_data, usage=usage, current_plan=get_plan((profile_data or {}).get("plan")))
 
 
 @app.get("/settings", response_class=HTMLResponse)
@@ -209,13 +293,24 @@ def settings(request: Request):
         "supabase_database": supabase_database_configured(),
         "openai": bool(os.getenv("OPENAI_API_KEY")),
         "gemini": bool(os.getenv("GEMINI_API_KEY")),
+        "groq": bool(os.getenv("GROQ_API_KEY")),
     }
-    return page(request, "settings.html", configured=configured)
+    defaults = {
+        "reasoning": default_groq_model("reasoning"),
+        "text": default_groq_model("text"),
+        "vision": default_groq_model("vision"),
+        "multilingual": default_groq_model("multilingual"),
+        "speech_to_text": default_groq_model("speech_to_text"),
+        "text_to_speech": default_groq_model("text_to_speech"),
+    }
+    return page(request, "settings.html", configured=configured, groq_defaults=defaults)
 
 
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing(request: Request):
-    return page(request, "pricing.html")
+    user = user_from_session(request)
+    profile_data = fetch_profile(user.get("id"), user.get("access_token")) if user else None
+    return page(request, "pricing.html", current_plan_id=(profile_data or {}).get("plan", "starter"))
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -298,11 +393,225 @@ def logout(request: Request):
 
 @app.get("/api/usage")
 def usage():
-    return {
-        "requestsToday": 2480,
-        "monthlyLimit": 5000,
-        "domains": {"agriculture": 1284, "healthcare": 932, "education": 1621},
+    return {"message": "Use authenticated /analytics for real user usage data."}
+
+
+@app.post("/api/billing/create-order")
+async def create_billing_order(request: Request, plan: str = Form(...), csrf_token: str = Form(...)):
+    user_or_response = require_user(request)
+    if isinstance(user_or_response, RedirectResponse):
+        raise HTTPException(status_code=401, detail="Login required.")
+    verify_csrf(request, csrf_token)
+
+    plan_config = get_plan(plan)
+    if plan_config["price_inr"] <= 0:
+        raise HTTPException(status_code=400, detail="This plan does not require payment.")
+
+    key_id = os.getenv("RAZORPAY_KEY_ID")
+    key_secret = os.getenv("RAZORPAY_KEY_SECRET")
+    if not key_id or not key_secret:
+        raise HTTPException(status_code=503, detail="Razorpay keys are not configured.")
+
+    amount = int(plan_config["price_inr"] * 100)
+    payload = {
+        "amount": amount,
+        "currency": "INR",
+        "receipt": f"agromind-{user_or_response.get('id')}-{plan}",
+        "notes": {"user_id": user_or_response.get("id"), "plan": plan},
     }
+    auth = base64.b64encode(f"{key_id}:{key_secret}".encode("utf-8")).decode("ascii")
+    try:
+        import httpx
+
+        response = httpx.post(
+            "https://api.razorpay.com/v1/orders",
+            headers={"Authorization": f"Basic {auth}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=20,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not reach Razorpay: {exc}") from exc
+    if response.status_code >= 400:
+        raise HTTPException(status_code=502, detail="Razorpay order creation failed.")
+
+    order = response.json()
+    save_payment(user_or_response.get("id"), plan, amount, order.get("id", ""), status="created")
+    return {
+        "key_id": key_id,
+        "order_id": order.get("id"),
+        "amount": amount,
+        "currency": "INR",
+        "plan_name": plan_config["name"],
+    }
+
+
+@app.post("/api/billing/verify")
+async def verify_billing_payment(
+    request: Request,
+    plan: str = Form(...),
+    csrf_token: str = Form(...),
+    razorpay_order_id: str = Form(...),
+    razorpay_payment_id: str = Form(...),
+    razorpay_signature: str = Form(...),
+):
+    user_or_response = require_user(request)
+    if isinstance(user_or_response, RedirectResponse):
+        raise HTTPException(status_code=401, detail="Login required.")
+    verify_csrf(request, csrf_token)
+
+    secret = os.getenv("RAZORPAY_KEY_SECRET")
+    if not secret:
+        raise HTTPException(status_code=503, detail="Razorpay secret is not configured.")
+    body = f"{razorpay_order_id}|{razorpay_payment_id}".encode("utf-8")
+    expected = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, razorpay_signature):
+        raise HTTPException(status_code=400, detail="Invalid Razorpay payment signature.")
+
+    plan_config = get_plan(plan)
+    update_profile_plan(user_or_response.get("id"), plan, user_or_response.get("access_token"))
+    save_subscription(user_or_response.get("id"), plan, user_or_response.get("access_token"))
+    save_payment(
+        user_or_response.get("id"),
+        plan,
+        int(plan_config["price_inr"] * 100),
+        razorpay_order_id,
+        razorpay_payment_id,
+        "paid",
+    )
+    return {"ok": True, "plan": plan}
+
+
+@app.post("/api/voice-assistant")
+async def voice_assistant(
+    request: Request,
+    query: str = Form(...),
+    csrf_token: str = Form(...),
+    language: str = Form(DEFAULT_LANGUAGE),
+):
+    user_or_response = require_user(request)
+    if isinstance(user_or_response, RedirectResponse):
+        raise HTTPException(status_code=401, detail="Login required.")
+    verify_csrf(request, csrf_token)
+
+    selected_language = resolve_response_language(query, language)
+    system_prompt = (
+        "You are the voice assistant for AgroMind, a multi-domain AI platform for agriculture, healthcare, and education. "
+        "Keep your response brief, friendly, highly conversational, and direct (max 2-3 sentences) because it will be spoken "
+        "out loud by text-to-speech. Maintain professional, highly accurate, and helpful domain knowledge. "
+        f"Respond in {selected_language['name']}."
+    )
+
+    try:
+        if os.getenv("GROQ_API_KEY"):
+            from openai import OpenAI
+            client = OpenAI(
+                api_key=os.getenv("GROQ_API_KEY"),
+                base_url="https://api.groq.com/openai/v1",
+                timeout=45,
+            )
+            completion = client.chat.completions.create(
+                model=default_groq_model("multilingual"),
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": query},
+                ],
+            )
+            response_text = completion.choices[0].message.content or ""
+        elif os.getenv("OPENAI_API_KEY"):
+            from openai import OpenAI
+            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=45)
+            completion = client.chat.completions.create(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": query},
+                ],
+            )
+            response_text = completion.choices[0].message.content or ""
+        elif os.getenv("GEMINI_API_KEY"):
+            import google.generativeai as genai
+            genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+            from agromind.ai import gemini_model_candidates
+            model_name = gemini_model_candidates()[0]
+            model = genai.GenerativeModel(model_name)
+            result = model.generate_content(f"{system_prompt}\n\nUser Question: {query}", request_options={"timeout": 45})
+            response_text = result.text or ""
+        else:
+            response_text = "I am ready to help, but no AI providers are currently configured. Please configure your API keys."
+    except Exception as exc:
+        response_text = f"Sorry, I encountered an error while processing your request: {str(exc)}"
+
+    return {"response": response_text, "language": selected_language["code"]}
+
+
+@app.post("/api/speech-to-text")
+async def speech_to_text(
+    request: Request,
+    audio: UploadFile = File(...),
+    csrf_token: str = Form(...),
+    language: str = Form(DEFAULT_LANGUAGE),
+):
+    user_or_response = require_user(request)
+    if isinstance(user_or_response, RedirectResponse):
+        raise HTTPException(status_code=401, detail="Login required.")
+    verify_csrf(request, csrf_token)
+    if not os.getenv("GROQ_API_KEY"):
+        raise HTTPException(status_code=503, detail="Groq API key is not configured.")
+
+    selected_language = resolve_response_language(text, language)
+    content = await audio.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Audio file is empty.")
+
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=os.getenv("GROQ_API_KEY"), base_url="https://api.groq.com/openai/v1", timeout=60)
+        transcript = client.audio.transcriptions.create(
+            file=(audio.filename or "audio.webm", content, audio.content_type or "audio/webm"),
+            model=default_groq_model("speech_to_text"),
+            language=selected_language["groq_code"],
+        )
+        return {"text": getattr(transcript, "text", ""), "model": default_groq_model("speech_to_text")}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Groq speech-to-text failed: {exc}") from exc
+
+
+@app.post("/api/text-to-speech")
+async def text_to_speech(
+    request: Request,
+    text: str = Form(...),
+    csrf_token: str = Form(...),
+    language: str = Form(DEFAULT_LANGUAGE),
+):
+    user_or_response = require_user(request)
+    if isinstance(user_or_response, RedirectResponse):
+        raise HTTPException(status_code=401, detail="Login required.")
+    verify_csrf(request, csrf_token)
+    if not os.getenv("GROQ_API_KEY"):
+        raise HTTPException(status_code=503, detail="Groq API key is not configured.")
+
+    selected_language = get_language(language)
+    model = groq_tts_model_for_language(selected_language["code"])
+    if not model:
+        raise HTTPException(
+            status_code=422,
+            detail="Groq text-to-speech currently supports English and Arabic Saudi only. Browser TTS is used for the other supported app languages.",
+        )
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=os.getenv("GROQ_API_KEY"), base_url="https://api.groq.com/openai/v1", timeout=60)
+        speech = client.audio.speech.create(
+            model=model,
+            voice="tara",
+            input=text[:4000],
+            response_format="wav",
+        )
+        audio_bytes = speech.read() if hasattr(speech, "read") else bytes(speech.content)
+        return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/wav", headers={"X-AgroMind-Model": model})
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Groq text-to-speech failed: {exc}") from exc
 
 
 @app.post("/api/export/report")

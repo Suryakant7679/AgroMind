@@ -1,7 +1,7 @@
 from agromind.data import MEDICAL_DISCLAIMER, get_domain, get_tool
 
 
-def build_system_prompt(domain_id: str, tool_id: str) -> str:
+def build_system_prompt(domain_id: str, tool_id: str, language_name: str = "English") -> str:
     domain = get_domain(domain_id)
     tool = get_tool(domain_id, tool_id)
     safety = ""
@@ -13,6 +13,7 @@ def build_system_prompt(domain_id: str, tool_id: str) -> str:
 
     parts = [
         "You are AgroMind AI, a careful multi-domain assistant.",
+        f"Respond only in {language_name}. Keep technical terms clear and explain them simply when needed.",
         "Return concise, structured Markdown with headings, bullet points, tables when useful, and a short next-steps checklist.",
         "Do not fabricate lab values, market prices, weather, government rules, or diagnoses. State uncertainty and what extra data is needed.",
         "For uploaded images or PDFs, explain that analysis depends on file readability and the configured multimodal provider.",

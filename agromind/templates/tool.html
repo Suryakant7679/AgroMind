@@ -10,6 +10,17 @@
       {% endif %}
       <form method="post" enctype="multipart/form-data" style="margin-top:1rem">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="model-panel">
+          <div class="form-row">
+            <label for="__language">Language preference</label>
+            <select id="__language" name="__language" class="language-select">
+              {% for language in languages %}
+                <option value="{{ language.code }}">{{ language.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <p class="field-note">AgroMind automatically chooses the right AI for reasoning, multilingual answers, and image analysis.</p>
+        </div>
         {% for field in tool.fields %}
           <div class="form-row">
             <label for="{{ field.name }}">{{ field.label }}</label>
@@ -30,7 +41,17 @@
         {% if tool.accepts %}
           <div class="form-row">
             <label for="asset">Upload file</label>
-            <input id="asset" name="asset" type="file">
+            <div class="file-actions">
+              <label class="file-action">
+                <span>Choose file</span>
+                <input id="asset" name="asset" type="file" accept="image/*,.pdf">
+              </label>
+              <label class="file-action">
+                <span>Use camera</span>
+                <input id="asset-camera" name="asset_camera" type="file" accept="image/*" capture="environment">
+              </label>
+            </div>
+            <p class="field-note">Upload or capture plant leaves, skin photos, report images, or readable PDFs/images when the tool needs visual context.</p>
           </div>
         {% endif %}
         <button class="button" type="submit">Generate</button>
@@ -38,11 +59,18 @@
       </form>
     </section>
     <section class="card">
-      <h2>AI Output</h2>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+        <h2 style="margin: 0;">AI Output</h2>
+        {% if output_html %}
+          <button type="button" class="tts-speak-btn" onclick="speakText(document.getElementById('ai-output-text').innerText, this, null, '{{ response_language or default_language }}')">
+            <span class="speaker-icon">🔊</span> <span class="btn-label">Listen</span>
+          </button>
+        {% endif %}
+      </div>
       {% if error %}
         <p class="error">{{ error }}</p>
       {% elif output_html %}
-        <div class="output">{{ output_html|safe }}</div>
+        <div id="ai-output-text" class="output" data-response-language="{{ response_language or default_language }}">{{ output_html|safe }}</div>
       {% else %}
         <p class="muted">Results, tables, and markdown reports will appear here.</p>
       {% endif %}

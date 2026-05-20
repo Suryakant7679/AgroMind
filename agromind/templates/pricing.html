@@ -1,9 +1,60 @@
 {% extends "base.html" %}
 {% block content %}
   <h1 class="page-title">Plans</h1>
+  <p class="muted">Starter follows Gemini Flash-Lite style free limits. Paid plans unlock Groq premium model routing with higher monthly capacity.</p>
   <div class="grid grid-3">
-    <div class="card"><h2>Starter</h2><strong>Free</strong><p class="muted">Try the core AI tools.</p></div>
-    <div class="card"><h2>Pro</h2><strong>$29/mo</strong><p class="muted">Higher usage and exports.</p></div>
-    <div class="card"><h2>Team</h2><strong>$99/mo</strong><p class="muted">Shared workspaces and admin controls.</p></div>
+    {% for plan in plans %}
+      <div class="card plan-card">
+        <span class="badge">{{ "Current" if current_plan_id == plan.id else plan.name }}</span>
+        <h2>{{ plan.name }}</h2>
+        <strong>{{ "Free" if plan.price_inr == 0 else "₹" ~ plan.price_inr ~ "/mo" }}</strong>
+        <p class="muted">{{ plan.description }}</p>
+        <ul class="plan-list">
+          <li>{{ "{:,}".format(plan.daily_requests) }} requests/day</li>
+          <li>{{ "{:,}".format(plan.monthly_tokens) }} tokens/month</li>
+          <li>{{ plan.monthly_credits }} AI credits/month</li>
+          <li>{{ plan.model_access }}</li>
+        </ul>
+        {% if user and plan.price_inr > 0 and current_plan_id != plan.id %}
+          <button class="button" type="button" onclick="startCheckout('{{ plan.id }}')">Upgrade</button>
+        {% elif not user and plan.price_inr > 0 %}
+          <a class="button" href="/login?next=/pricing">Login to upgrade</a>
+        {% endif %}
+      </div>
+    {% endfor %}
   </div>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script>
+    async function startCheckout(plan) {
+      const formData = new FormData();
+      formData.append("plan", plan);
+      formData.append("csrf_token", globalCsrfToken);
+      const response = await fetch("/api/billing/create-order", { method: "POST", body: formData });
+      const order = await response.json();
+      if (!response.ok) {
+        alert(order.detail || "Could not start payment.");
+        return;
+      }
+      const checkout = new Razorpay({
+        key: order.key_id,
+        amount: order.amount,
+        currency: order.currency,
+        name: "AgroMind AI",
+        description: order.plan_name,
+        order_id: order.order_id,
+        handler: async function (payment) {
+          const verifyData = new FormData();
+          verifyData.append("plan", plan);
+          verifyData.append("csrf_token", globalCsrfToken);
+          verifyData.append("razorpay_order_id", payment.razorpay_order_id);
+          verifyData.append("razorpay_payment_id", payment.razorpay_payment_id);
+          verifyData.append("razorpay_signature", payment.razorpay_signature);
+          const verify = await fetch("/api/billing/verify", { method: "POST", body: verifyData });
+          if (verify.ok) window.location.href = "/profile";
+          else alert("Payment verification failed.");
+        }
+      });
+      checkout.open();
+    }
+  </script>
 {% endblock %}

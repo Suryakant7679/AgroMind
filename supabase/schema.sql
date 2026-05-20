@@ -30,6 +30,7 @@ create table if not exists public.usage_events (
   tool text not null,
   provider text not null,
   tokens_used integer not null default 0,
+  credits_used integer not null default 0,
   cost_cents integer not null default 0,
   created_at timestamptz not null default now()
 );
@@ -43,10 +44,25 @@ create table if not exists public.subscriptions (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.payments (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references auth.users(id) on delete set null,
+  plan text not null,
+  amount_paise integer not null default 0,
+  provider text not null default 'razorpay',
+  provider_order_id text,
+  provider_payment_id text,
+  status text not null default 'created',
+  created_at timestamptz not null default now()
+);
+
+alter table public.usage_events add column if not exists credits_used integer not null default 0;
+
 alter table public.profiles enable row level security;
 alter table public.ai_outputs enable row level security;
 alter table public.usage_events enable row level security;
 alter table public.subscriptions enable row level security;
+alter table public.payments enable row level security;
 
 create policy "Users can read own profile"
 on public.profiles for select
@@ -70,6 +86,10 @@ using (auth.uid() = user_id);
 
 create policy "Users can read own subscriptions"
 on public.subscriptions for select
+using (auth.uid() = user_id);
+
+create policy "Users can read own payments"
+on public.payments for select
 using (auth.uid() = user_id);
 
 create or replace function public.handle_new_user()
