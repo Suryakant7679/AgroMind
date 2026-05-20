@@ -88,8 +88,24 @@ create policy "Users can read own subscriptions"
 on public.subscriptions for select
 using (auth.uid() = user_id);
 
+create policy "Users can insert own subscriptions"
+on public.subscriptions for insert
+with check (auth.uid() = user_id);
+
+create policy "Users can update own subscriptions"
+on public.subscriptions for update
+using (auth.uid() = user_id);
+
 create policy "Users can read own payments"
 on public.payments for select
+using (auth.uid() = user_id);
+
+create policy "Users can insert own payments"
+on public.payments for insert
+with check (auth.uid() = user_id);
+
+create policy "Users can update own payments"
+on public.payments for update
 using (auth.uid() = user_id);
 
 create or replace function public.handle_new_user()

@@ -1,60 +1,142 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1 class="page-title">Plans</h1>
-  <p class="muted">Starter follows Gemini Flash-Lite style free limits. Paid plans unlock Groq premium model routing with higher monthly capacity.</p>
-  <div class="grid grid-3">
+<div class="pricing-container">
+  <div class="pricing-header">
+    <h1 class="page-title pricing-title">Simple, Transparent Pricing</h1>
+    <p class="muted pricing-subtitle">Choose the perfect plan for your agricultural, healthcare, or educational workflow. No hidden fees.</p>
+  </div>
+
+  <div class="grid grid-3 pricing-grid">
     {% for plan in plans %}
-      <div class="card plan-card">
-        <span class="badge">{{ "Current" if current_plan_id == plan.id else plan.name }}</span>
-        <h2>{{ plan.name }}</h2>
-        <strong>{{ "Free" if plan.price_inr == 0 else "₹" ~ plan.price_inr ~ "/mo" }}</strong>
-        <p class="muted">{{ plan.description }}</p>
-        <ul class="plan-list">
-          <li>{{ "{:,}".format(plan.daily_requests) }} requests/day</li>
-          <li>{{ "{:,}".format(plan.monthly_tokens) }} tokens/month</li>
-          <li>{{ plan.monthly_credits }} AI credits/month</li>
-          <li>{{ plan.model_access }}</li>
-        </ul>
-        {% if user and plan.price_inr > 0 and current_plan_id != plan.id %}
-          <button class="button" type="button" onclick="startCheckout('{{ plan.id }}')">Upgrade</button>
-        {% elif not user and plan.price_inr > 0 %}
-          <a class="button" href="/login?next=/pricing">Login to upgrade</a>
+      <div class="card plan-card {% if plan.id == 'pro' %}recommended-card{% endif %} {% if current_plan_id == plan.id %}current-card{% endif %}">
+        {% if plan.id == 'pro' %}
+          <div class="recommended-badge">Highly Recommended</div>
         {% endif %}
+        
+        <div class="plan-header">
+          <h2 class="plan-name">{{ plan.name }}</h2>
+          <div class="plan-price">
+            {% if plan.price_inr == 0 %}
+              <span class="price-currency">₹</span><span class="price-amount">0</span><span class="price-period">/month</span>
+            {% else %}
+              <span class="price-currency">₹</span><span class="price-amount">{{ plan.price_inr }}</span><span class="price-period">/month</span>
+            {% endif %}
+          </div>
+          <p class="muted plan-desc">{{ plan.description }}</p>
+        </div>
+
+        <div class="plan-divider"></div>
+
+        <ul class="plan-list">
+          <li>
+            <span class="check-icon">✓</span>
+            <span><strong>{{ "{:,}".format(plan.daily_requests) }}</strong> requests/day</span>
+          </li>
+          <li>
+            <span class="check-icon">✓</span>
+            <span><strong>{{ "{:,}".format(plan.monthly_tokens) }}</strong> tokens/month</span>
+          </li>
+          <li>
+            <span class="check-icon">✓</span>
+            <span><strong>{{ "{:,}".format(plan.monthly_credits) }}</strong> AI credits/month</span>
+          </li>
+          <li>
+            <span class="check-icon">✓</span>
+            <span class="model-access-text">{{ plan.model_access }}</span>
+          </li>
+        </ul>
+
+        <div class="plan-cta">
+          {% if current_plan_id == plan.id %}
+            <button class="button active-btn" type="button" disabled>Current Plan</button>
+          {% elif plan.id == 'starter' and current_plan_id != 'starter' %}
+            {% if user %}
+              <button class="button secondary downgrade-btn" type="button" onclick="switchFree()">Switch to Free</button>
+            {% else %}
+              <a class="button secondary" href="/login?next=/pricing">Select Free</a>
+            {% endif %}
+          {% elif plan.price_inr > 0 %}
+            {% if user %}
+              <button class="button checkout-btn" type="button" onclick="startCheckout('{{ plan.id }}')">
+                {% if current_plan_id == 'starter' %}
+                  Upgrade
+                {% else %}
+                  Switch Plan
+                {% endif %}
+              </button>
+            {% else %}
+              <a class="button" href="/login?next=/pricing">Login to Upgrade</a>
+            {% endif %}
+          {% else %}
+            <!-- Default Free Plan state when not current and price is 0 -->
+            <button class="button active-btn" type="button" disabled>Active</button>
+          {% endif %}
+        </div>
       </div>
     {% endfor %}
   </div>
-  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-  <script>
-    async function startCheckout(plan) {
-      const formData = new FormData();
-      formData.append("plan", plan);
-      formData.append("csrf_token", globalCsrfToken);
-      const response = await fetch("/api/billing/create-order", { method: "POST", body: formData });
-      const order = await response.json();
-      if (!response.ok) {
-        alert(order.detail || "Could not start payment.");
-        return;
-      }
-      const checkout = new Razorpay({
-        key: order.key_id,
-        amount: order.amount,
-        currency: order.currency,
-        name: "AgroMind AI",
-        description: order.plan_name,
-        order_id: order.order_id,
-        handler: async function (payment) {
-          const verifyData = new FormData();
-          verifyData.append("plan", plan);
-          verifyData.append("csrf_token", globalCsrfToken);
-          verifyData.append("razorpay_order_id", payment.razorpay_order_id);
-          verifyData.append("razorpay_payment_id", payment.razorpay_payment_id);
-          verifyData.append("razorpay_signature", payment.razorpay_signature);
-          const verify = await fetch("/api/billing/verify", { method: "POST", body: verifyData });
-          if (verify.ok) window.location.href = "/profile";
-          else alert("Payment verification failed.");
-        }
-      });
-      checkout.open();
+</div>
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+  async function startCheckout(plan) {
+    const formData = new FormData();
+    formData.append("plan", plan);
+    formData.append("csrf_token", globalCsrfToken);
+    
+    const response = await fetch("/api/billing/create-order", { method: "POST", body: formData });
+    const order = await response.json();
+    if (!response.ok) {
+      alert(order.detail || "Could not start payment.");
+      return;
     }
-  </script>
+    
+    const checkout = new Razorpay({
+      key: order.key_id,
+      amount: order.amount,
+      currency: order.currency,
+      name: "AgroMind AI",
+      description: "Upgrade to " + order.plan_name + " Plan",
+      order_id: order.order_id,
+      handler: async function (payment) {
+        const verifyData = new FormData();
+        verifyData.append("plan", plan);
+        verifyData.append("csrf_token", globalCsrfToken);
+        verifyData.append("razorpay_order_id", payment.razorpay_order_id);
+        verifyData.append("razorpay_payment_id", payment.razorpay_payment_id);
+        verifyData.append("razorpay_signature", payment.razorpay_signature);
+        
+        const verify = await fetch("/api/billing/verify", { method: "POST", body: verifyData });
+        if (verify.ok) {
+          window.location.href = "/profile";
+        } else {
+          alert("Payment verification failed.");
+        }
+      }
+    });
+    checkout.open();
+  }
+
+  async function switchFree() {
+    if (!confirm("Are you sure you want to switch back to the Free Starter plan? This will change your limits immediately.")) {
+      return;
+    }
+    const formData = new FormData();
+    formData.append("plan", "starter");
+    formData.append("csrf_token", globalCsrfToken);
+    
+    try {
+      const response = await fetch("/api/billing/downgrade", { method: "POST", body: formData });
+      const data = await response.json();
+      if (response.ok && data.ok) {
+        window.location.href = "/profile";
+      } else {
+        alert(data.detail || "Downgrade failed.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An error occurred during downgrade.");
+    }
+  }
+</script>
 {% endblock %}

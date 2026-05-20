@@ -98,3 +98,40 @@ def test_admin_page_uses_profiles(monkeypatch):
         response = test_client.get("/admin")
         assert response.status_code == 200
         assert "Member User" in response.text
+
+
+def test_downgrade_billing_plan(monkeypatch):
+    monkeypatch.setattr(main, "user_from_session", lambda request: {"id": "user-1", "email": "u@example.com"})
+    
+    updated_plan = None
+    saved_sub = None
+    
+    def mock_update_profile_plan(user_id, plan, token=None):
+        nonlocal updated_plan
+        updated_plan = plan
+        
+    def mock_save_subscription(user_id, plan, token=None):
+        nonlocal saved_sub
+        saved_sub = plan
+
+    monkeypatch.setattr(main, "update_profile_plan", mock_update_profile_plan)
+    monkeypatch.setattr(main, "save_subscription", mock_save_subscription)
+    monkeypatch.setattr(main, "verify_csrf", lambda request, token: None)
+
+    with client() as test_client:
+        response = test_client.post(
+            "/api/billing/downgrade",
+            data={"plan": "starter", "csrf_token": "mocked-csrf-token"}
+        )
+        assert response.status_code == 200
+        assert response.json() == {"ok": True, "plan": "starter"}
+        assert updated_plan == "starter"
+        assert saved_sub == "starter"
+
+        response_fail = test_client.post(
+            "/api/billing/downgrade",
+            data={"plan": "pro", "csrf_token": "mocked-csrf-token"}
+        )
+        assert response_fail.status_code == 400
+        assert "Only downgrades to starter are supported" in response_fail.json()["detail"]
+

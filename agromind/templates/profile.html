@@ -7,7 +7,13 @@
       <div><label>Name</label><input value="{{ profile.full_name if profile else 'AgroMind User' }}"></div>
       <div><label>Email</label><input value="{{ profile.email if profile else user.email if user else 'user@example.com' }}"></div>
       <div><label>Organization</label><input value="{{ profile.organization if profile else 'AgroMind Workspace' }}"></div>
-      <div><label>Plan</label><input value="{{ profile.plan if profile else 'starter' }}"></div>
+      <div>
+        <label>Plan</label>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <input value="{{ current_plan.name if current_plan else 'Starter' }}" readonly style="background:#f1f5f9; cursor:not-allowed; flex:1;">
+          <a class="button secondary" href="/pricing" style="white-space:nowrap; padding:0.5rem 0.8rem; min-height:auto; font-size:0.85rem;">Manage Plan</a>
+        </div>
+      </div>
     </div>
   </div>
   <div class="grid grid-3" style="margin-top:1rem">

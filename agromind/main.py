@@ -49,6 +49,12 @@ from agromind.supabase_store import (
 load_dotenv(".env.local")
 load_dotenv()
 
+# Clean environment variables of spaces/quotes
+for env_key in ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"]:
+    env_val = os.getenv(env_key)
+    if env_val:
+        os.environ[env_key] = env_val.strip().strip("'\"")
+
 DEFAULT_DEV_SECRET = "agromind-dev-secret"
 BASE_DIR = Path(__file__).resolve().parent
 session_secret = os.getenv("SESSION_SECRET", DEFAULT_DEV_SECRET)
@@ -479,6 +485,21 @@ async def verify_billing_payment(
         "paid",
     )
     return {"ok": True, "plan": plan}
+
+
+@app.post("/api/billing/downgrade")
+async def downgrade_billing_plan(request: Request, plan: str = Form(...), csrf_token: str = Form(...)):
+    user_or_response = require_user(request)
+    if isinstance(user_or_response, RedirectResponse):
+        raise HTTPException(status_code=401, detail="Login required.")
+    verify_csrf(request, csrf_token)
+
+    if plan.lower() != "starter":
+        raise HTTPException(status_code=400, detail="Only downgrades to starter are supported via this route.")
+
+    update_profile_plan(user_or_response.get("id"), "starter", user_or_response.get("access_token"))
+    save_subscription(user_or_response.get("id"), "starter", user_or_response.get("access_token"))
+    return {"ok": True, "plan": "starter"}
 
 
 @app.post("/api/voice-assistant")
