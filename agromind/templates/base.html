@@ -9,10 +9,13 @@
   <body>
     <div class="layout">
       <aside class="sidebar">
-        <a class="brand" href="/">
-          <span class="brand-mark">AI</span>
-          <span>AgroMind AI<br><span class="muted" style="font-size:.8rem" data-i18n="brand.subtitle">founded by surya</span></span>
-        </a>
+        <div class="sidebar-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+          <a class="brand" href="/" style="margin-bottom:0;">
+            <span class="brand-mark">AI</span>
+            <span>AgroMind AI<br><span class="muted" style="font-size:.8rem" data-i18n="brand.subtitle">founded by surya</span></span>
+          </a>
+          <button class="sidebar-close-btn" onclick="toggleSidebar(event)" aria-label="Close menu">✕</button>
+        </div>
         <div class="nav-group">
           <p class="nav-title" data-i18n="nav.workspace">Workspace</p>
           <a class="nav-link" href="/dashboard" data-i18n="nav.dashboard">Dashboard</a>
@@ -31,7 +34,9 @@
       </aside>
       <main class="main">
         <div class="topbar">
-          <div></div>
+          <div class="topbar-left">
+            <button class="menu-toggle" id="menu-toggle" onclick="toggleSidebar(event)" aria-label="Toggle Menu">☰</button>
+          </div>
           <div class="topbar-actions">
             <label class="language-label" for="global-language" data-i18n="topbar.language">Language</label>
             <select id="global-language" class="global-language-select">
@@ -51,6 +56,7 @@
         {% block content %}{% endblock %}
       </main>
     </div>
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar(event)"></div>
 
     {% if user %}
     <!-- Floating Voice Assistant Widget -->
@@ -84,6 +90,20 @@
     {% endif %}
 
     <script>
+      // Responsive Sidebar Toggle
+      function toggleSidebar(e) {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        const sidebar = document.querySelector(".sidebar");
+        const overlay = document.getElementById("sidebar-overlay");
+        if (sidebar && overlay) {
+          sidebar.classList.toggle("open");
+          overlay.classList.toggle("active");
+        }
+      }
+
       // Global CSRF Token
       const globalCsrfToken = "{{ csrf_token }}";
 
