@@ -1,5 +1,6 @@
 import base64
 import os
+import re
 
 from fastapi import UploadFile
 
@@ -86,6 +87,39 @@ def infer_groq_task(tool_id: str, fields: dict[str, str], language_code: str, ha
     return "reasoning" if matched_terms >= 2 or reasoning_score >= 0.08 else "text"
 
 
+def extract_youtube_video_id(url: str) -> str | None:
+    if not url:
+        return None
+    patterns = [
+        r'(?:v=|\/v\/|embed\/|shorts\/|youtu\.be\/|\/embed\/|\/v\/|\/watch\?v=|\/watch\?.+&v=)([^#\&\?]{11})',
+        r'(?:youtube\.com\/watch\?v=)([^#\&\?]{11})',
+        r'(?:youtu\.be\/)([^#\&\?]{11})'
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    if "youtube.com" in url or "youtu.be" in url:
+        match = re.search(r'\/([^#\&\?]{11})', url)
+        if match:
+            return match.group(1)
+    return None
+
+
+def fetch_youtube_transcript_text(video_id: str) -> str | None:
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi
+        try:
+            transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'hi', 'es'])
+        except Exception:
+            list_transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
+            transcript = list_transcripts.find_transcript([]).fetch()
+        return " ".join([item["text"] for item in transcript])
+    except Exception as e:
+        print(f"Error getting youtube transcript: {e}")
+        return None
+
+
 async def generate_ai_response(
     domain_id: str,
     tool_id: str,
@@ -94,16 +128,34 @@ async def generate_ai_response(
     language_code: str = "en-US",
     plan: str = "starter",
 ) -> tuple[str, str, str]:
+    fields_copy = fields.copy()
+    if tool_id == "youtube-learning-tool":
+        url = fields.get("url", "").strip()
+        if not url:
+            raise AIProviderError("Please enter a valid YouTube URL to generate notes.")
+        
+        video_id = extract_youtube_video_id(url)
+        if not video_id:
+            raise AIProviderError("Invalid YouTube URL. Please verify the link format (e.g., https://www.youtube.com/watch?v=...).")
+        
+        transcript = fetch_youtube_transcript_text(video_id)
+        if not transcript:
+            raise AIProviderError(
+                "Could not retrieve a transcript for this YouTube video. "
+                "Please verify that the video exists, is public, and has closed captions (CC)/subtitles enabled."
+            )
+        fields_copy["video_transcript"] = transcript
+
     file_summary, image_base64, mime_type = await summarize_file(file)
-    prompt_text = " ".join(fields.values())
+    prompt_text = " ".join(fields_copy.values())
     language = resolve_response_language(prompt_text, language_code)
     has_image = bool(image_base64 and mime_type and mime_type.startswith("image/"))
-    task = infer_groq_task(tool_id, fields, language["code"], has_image)
+    task = infer_groq_task(tool_id, fields_copy, language["code"], has_image)
     if not has_image and detect_language_from_text(prompt_text) and task == "text":
         task = "multilingual"
 
     system_prompt = build_system_prompt(domain_id, tool_id, language["name"])
-    user_prompt = build_user_prompt(fields, file_summary)
+    user_prompt = build_user_prompt(fields_copy, file_summary)
 
     prefer_gemini = plan == "starter" and os.getenv("GEMINI_API_KEY")
 
