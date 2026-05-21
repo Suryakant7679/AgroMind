@@ -75,7 +75,7 @@
           </div>
         </div>
         <div class="voice-footer" style="padding: 0.75rem 1rem; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 0.5rem; background: var(--panel);">
-          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;">
             <div class="voice-visualizer" id="voice-visualizer" style="height: 16px;">
               <div class="voice-bar"></div>
               <div class="voice-bar"></div>
@@ -83,7 +83,15 @@
               <div class="voice-bar"></div>
               <div class="voice-bar"></div>
             </div>
-            <span class="voice-status-text" id="voice-status" style="font-size: 0.68rem; font-weight: 700; color: var(--muted); text-transform: uppercase;">Idle</span>
+            <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+              <!-- AI Chat Language Selector -->
+              <select id="assistant-language" style="font-size: 0.68rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--line); background: var(--panel); color: var(--text); outline: none; cursor: pointer;">
+                {% for language in languages %}
+                  <option value="{{ language.code }}">{{ language.name }}</option>
+                {% endfor %}
+              </select>
+              <span class="voice-status-text" id="voice-status" style="font-size: 0.68rem; font-weight: 700; color: var(--muted); text-transform: uppercase;">Idle</span>
+            </div>
           </div>
           
           <div class="voice-input-row" style="display: flex; align-items: center; width: 100%; gap: 8px;">
@@ -223,22 +231,51 @@
         "domain.education.short": "교육 AI", "domain.education.name": "교육 AI", "domain.education.tagline": "몇 분 안에 학습 자료를 만드세요.", "domain.education.description": "노트, 워크시트, MCQ, 발표자료, 튜터링, 채점, YouTube 학습 도구."
       };
 
+      const aiLanguageStorageKey = "agromind.ai_language";
+
       function currentLanguage() {
         const selector = document.getElementById("global-language");
-        return selector ? selector.value : "{{ default_language }}";
+        return selector ? selector.value : (localStorage.getItem(languageStorageKey) || "{{ default_language }}");
+      }
+
+      function assistantLanguage() {
+        const selector = document.getElementById("assistant-language");
+        if (selector) return selector.value;
+        const toolSelector = document.getElementById("__language");
+        if (toolSelector) return toolSelector.value;
+        return localStorage.getItem(aiLanguageStorageKey) || currentLanguage() || "en-US";
       }
 
       function syncLanguageSelectors(value) {
         document.documentElement.lang = value;
-        document.querySelectorAll(".language-select, #global-language").forEach(selector => {
-          selector.value = value;
-        });
+        const globalSelector = document.getElementById("global-language");
+        if (globalSelector) {
+          globalSelector.value = value;
+        }
         const pack = translations[value] || translations["en-US"];
         document.querySelectorAll("[data-i18n]").forEach(node => {
           const text = pack[node.dataset.i18n];
           if (text) node.textContent = text;
         });
         localStorage.setItem(languageStorageKey, value);
+      }
+
+      function syncAiLanguage(value) {
+        localStorage.setItem(aiLanguageStorageKey, value);
+        const assistantSelector = document.getElementById("assistant-language");
+        if (assistantSelector) {
+          assistantSelector.value = value;
+        }
+        const toolSelector = document.getElementById("__language");
+        if (toolSelector) {
+          toolSelector.value = value;
+        }
+        if (typeof recognition !== "undefined" && recognition) {
+          recognition.lang = value;
+        }
+        if (typeof assistantRecognition !== "undefined" && assistantRecognition) {
+          assistantRecognition.lang = value;
+        }
       }
 
       // --- 1. GLOBAL TEXT-TO-SPEECH (TTS) ENGINE ---
@@ -320,7 +357,7 @@
           if (onEndCallback) onEndCallback();
         };
 
-        utterance.lang = languageOverride || currentLanguage();
+        utterance.lang = languageOverride || assistantLanguage();
         const voices = window.speechSynthesis.getVoices();
         const langPrefix = utterance.lang.split("-")[0];
         const defaultVoice = voices.find(v => v.lang === utterance.lang) ||
@@ -333,11 +370,30 @@
 
       // --- 2. DYNAMIC INPUT FIELD VOICE TYPING (STT) ---
       document.addEventListener("DOMContentLoaded", () => {
+        // 1. Initialize Dashboard UI Language
         const savedLanguage = localStorage.getItem(languageStorageKey) || "{{ default_language }}";
         syncLanguageSelectors(savedLanguage);
-        document.querySelectorAll(".language-select, #global-language").forEach(selector => {
-          selector.addEventListener("change", () => syncLanguageSelectors(selector.value));
-        });
+        
+        const globalSelector = document.getElementById("global-language");
+        if (globalSelector) {
+          globalSelector.addEventListener("change", () => syncLanguageSelectors(globalSelector.value));
+        }
+
+        // 2. Initialize AI / Chat Language
+        const savedAiLanguage = localStorage.getItem(aiLanguageStorageKey) || savedLanguage;
+        syncAiLanguage(savedAiLanguage);
+
+        // Listen for changes in tool page language dropdown
+        const toolSelector = document.getElementById("__language");
+        if (toolSelector) {
+          toolSelector.addEventListener("change", () => syncAiLanguage(toolSelector.value));
+        }
+
+        // Listen for changes in assistant language dropdown
+        const assistantSelector = document.getElementById("assistant-language");
+        if (assistantSelector) {
+          assistantSelector.addEventListener("change", () => syncAiLanguage(assistantSelector.value));
+        }
 
         if (!isSpeechSupported) {
           console.log("Speech recognition not supported in this browser.");
@@ -381,7 +437,7 @@
             recognition = new SpeechRecognition();
             recognition.continuous = false;
             recognition.interimResults = false;
-            recognition.lang = currentLanguage();
+            recognition.lang = assistantLanguage();
 
             recognition.onstart = () => {
               isRecording = true;
@@ -505,7 +561,7 @@
         assistantRecognition = new SpeechRecognition();
         assistantRecognition.continuous = false;
         assistantRecognition.interimResults = false;
-        assistantRecognition.lang = currentLanguage();
+        assistantRecognition.lang = assistantLanguage();
 
         const micBtn = document.getElementById("voice-mic-btn");
         const visualizer = document.getElementById("voice-visualizer");
@@ -532,7 +588,7 @@
             const formData = new FormData();
             formData.append("query", queryText);
             formData.append("csrf_token", globalCsrfToken);
-            formData.append("language", currentLanguage());
+            formData.append("language", assistantLanguage());
 
             const response = await fetch("/api/voice-assistant", {
               method: "POST",
@@ -545,7 +601,7 @@
 
             const data = await response.json();
             const reply = data.response;
-            const replyLanguage = data.language || currentLanguage();
+            const replyLanguage = data.language || assistantLanguage();
 
             appendAssistantMessage(reply, false);
             if (visualizer) visualizer.classList.remove("listening");
@@ -606,7 +662,7 @@
           const formData = new FormData();
           formData.append("query", queryText);
           formData.append("csrf_token", globalCsrfToken);
-          formData.append("language", currentLanguage());
+          formData.append("language", assistantLanguage());
 
           const response = await fetch("/api/voice-assistant", {
             method: "POST",
@@ -619,7 +675,7 @@
 
           const data = await response.json();
           const reply = data.response;
-          const replyLanguage = data.language || currentLanguage();
+          const replyLanguage = data.language || assistantLanguage();
 
           appendAssistantMessage(reply, false);
           if (visualizer) visualizer.classList.remove("listening");
