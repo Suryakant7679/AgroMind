@@ -43,6 +43,7 @@ from agromind.supabase_store import (
     supabase_client,
     supabase_database_configured,
     update_profile_plan,
+    update_profile,
     usage_summary,
     verify_signup_otp,
 )
@@ -287,7 +288,56 @@ def profile(request: Request):
         return user_or_response
     profile_data = fetch_profile(user_or_response.get("id"), user_or_response.get("access_token"))
     usage = usage_summary(user_or_response.get("id"), user_or_response.get("access_token"))
-    return page(request, "profile.html", profile=profile_data, usage=usage, current_plan=get_plan((profile_data or {}).get("plan")))
+    return page(request, "profile.html", profile=profile_data, usage=usage, current_plan=get_plan((profile_data or {}).get("plan")), success=None, error=None)
+
+
+@app.post("/profile", response_class=HTMLResponse)
+async def profile_update(
+    request: Request,
+    full_name: str = Form(...),
+    organization: str = Form(""),
+    role: str = Form(""),
+    csrf_token: str = Form(...),
+):
+    user_or_response = require_user(request)
+    if isinstance(user_or_response, RedirectResponse):
+        return user_or_response
+    verify_csrf(request, csrf_token)
+
+    success_msg = None
+    error_msg = None
+    try:
+        current_profile = fetch_profile(user_or_response.get("id"), user_or_response.get("access_token")) or {}
+        role_to_save = role
+        if current_profile.get("role") == "admin":
+            role_to_save = "admin"
+        elif not role_to_save:
+            role_to_save = "member"
+
+        update_profile(
+            user_or_response.get("id"),
+            {
+                "full_name": full_name,
+                "organization": organization,
+                "role": role_to_save,
+            },
+            user_or_response.get("access_token"),
+        )
+        success_msg = "Profile updated successfully!"
+    except Exception as e:
+        error_msg = f"Failed to update profile: {str(e)}"
+
+    profile_data = fetch_profile(user_or_response.get("id"), user_or_response.get("access_token"))
+    usage = usage_summary(user_or_response.get("id"), user_or_response.get("access_token"))
+    return page(
+        request,
+        "profile.html",
+        profile=profile_data,
+        usage=usage,
+        current_plan=get_plan((profile_data or {}).get("plan")),
+        success=success_msg,
+        error=error_msg,
+    )
 
 
 @app.get("/settings", response_class=HTMLResponse)
@@ -583,8 +633,10 @@ async def voice_assistant(
         f"Align perfectly with their tone and language. Default to {selected_language['name']} if the query language is ambiguous."
     )
 
+    provider = "unknown"
     try:
         if os.getenv("GROQ_API_KEY"):
+            provider = "groq"
             from openai import OpenAI
             client = OpenAI(
                 api_key=os.getenv("GROQ_API_KEY"),
@@ -602,6 +654,7 @@ async def voice_assistant(
             )
             response_text = completion.choices[0].message.content or ""
         elif os.getenv("OPENAI_API_KEY"):
+            provider = "openai"
             from openai import OpenAI
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=45)
             messages = [{"role": "system", "content": system_prompt}]
@@ -615,6 +668,7 @@ async def voice_assistant(
             )
             response_text = completion.choices[0].message.content or ""
         elif os.getenv("GEMINI_API_KEY"):
+            provider = "gemini"
             import google.generativeai as genai
             genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
             from agromind.ai import gemini_model_candidates
@@ -634,6 +688,30 @@ async def voice_assistant(
             response_text = "I am ready to help, but no AI providers are currently configured. Please configure your API keys."
     except Exception as exc:
         response_text = f"Sorry, I encountered an error while processing your request: {str(exc)}"
+
+    # 3.5 Record AI usage metrics
+    if provider != "unknown" and not response_text.startswith("Sorry, I encountered an error"):
+        try:
+            from agromind.billing import estimate_text_tokens, estimate_cost
+            history_text = " ".join(msg["content"] for msg in chat_history)
+            full_prompt = f"{system_prompt} {history_text} {query}"
+            input_tokens = estimate_text_tokens(full_prompt)
+            output_tokens = max(1, len(response_text) // 4)
+            billing = estimate_cost(provider, input_tokens, output_tokens)
+            save_output(
+                user_or_response.get("id"),
+                "assistant",
+                "chat",
+                {"query": query},
+                response_text,
+                provider,
+                input_tokens,
+                billing["credits"],
+                billing["cost_cents"],
+                user_or_response.get("access_token"),
+            )
+        except Exception as db_exc:
+            print(f"Error saving assistant usage to database: {db_exc}")
 
     # 4. Record interaction in short-term session chat history
     chat_history.append({"role": "user", "content": query})

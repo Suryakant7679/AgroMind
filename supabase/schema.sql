@@ -84,6 +84,11 @@ create policy "Users can read own usage"
 on public.usage_events for select
 using (auth.uid() = user_id);
 
+create policy "Users can insert own usage"
+on public.usage_events for insert
+with check (auth.uid() = user_id);
+
+
 create policy "Users can read own subscriptions"
 on public.subscriptions for select
 using (auth.uid() = user_id);

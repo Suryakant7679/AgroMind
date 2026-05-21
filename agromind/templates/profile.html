@@ -2,21 +2,51 @@
 {% block content %}
   <h1 class="page-title">Profile</h1>
   <p class="muted">Manage your workspace identity and preferences.</p>
+
+  {% if success %}
+    <div style="color: #0f766e; background: #e6f4f1; border: 1px solid rgba(15, 118, 110, 0.2); padding: 0.85rem; border-radius: 0.5rem; max-width: 48rem; margin-bottom: 1.5rem; font-weight: 500;">
+      {{ success }}
+    </div>
+  {% endif %}
+  {% if error %}
+    <div style="color: #b91c1c; background: #fef2f2; border: 1px solid rgba(185, 28, 28, 0.2); padding: 0.85rem; border-radius: 0.5rem; max-width: 48rem; margin-bottom: 1.5rem; font-weight: 500;">
+      {{ error }}
+    </div>
+  {% endif %}
+
   <div class="card" style="max-width:48rem">
-    <div class="grid grid-2">
-      <div><label>Name</label><input value="{{ profile.full_name if profile else 'AgroMind User' }}"></div>
-      <div><label>Email</label><input value="{{ profile.email if profile else user.email if user else 'user@example.com' }}"></div>
-      <div><label>Organization</label><input value="{{ profile.organization if profile else 'AgroMind Workspace' }}"></div>
-      <div>
-        <label>Plan</label>
-        <div style="display:flex; gap:0.5rem; align-items:center;">
-          <input value="{{ current_plan.name if current_plan else 'Starter' }}" readonly style="background:#f1f5f9; cursor:not-allowed; flex:1;">
-          <a class="button secondary" href="/pricing" style="white-space:nowrap; padding:0.5rem 0.8rem; min-height:auto; font-size:0.85rem;">Manage Plan</a>
+    <form method="post" action="/profile">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="grid grid-2">
+        <div>
+          <label>Name</label>
+          <input name="full_name" type="text" value="{{ profile.full_name if profile else 'AgroMind User' }}" required style="width: 100%; box-sizing: border-box;">
+        </div>
+        <div>
+          <label>Email</label>
+          <input name="email" type="email" value="{{ profile.email if profile else user.email if user else 'user@example.com' }}" readonly style="background:#f1f5f9; cursor:not-allowed; width: 100%; box-sizing: border-box;">
+        </div>
+        <div>
+          <label>Organization</label>
+          <input name="organization" type="text" value="{{ profile.organization if profile and profile.organization else '' }}" placeholder="AgroMind Workspace" style="width: 100%; box-sizing: border-box;">
+        </div>
+        <div>
+          <label>Role / Profession</label>
+          <input name="role" type="text" value="{{ profile.role if profile and profile.role else '' }}" placeholder="e.g. Farmer, Student, Researcher" style="width: 100%; box-sizing: border-box;">
+        </div>
+        <div style="grid-column: span 2;">
+          <label>Plan</label>
+          <div style="display:flex; gap:0.5rem; align-items:center;">
+            <input value="{{ current_plan.name if current_plan else 'Starter' }}" readonly style="background:#f1f5f9; cursor:not-allowed; flex:1; box-sizing: border-box;">
+            <a class="button secondary" href="/pricing" style="white-space:nowrap; padding:0.5rem 0.8rem; min-height:auto; font-size:0.85rem; text-decoration:none;">Manage Plan</a>
+          </div>
         </div>
       </div>
-    </div>
+      <button class="button" type="submit" style="margin-top:1.5rem">Save Changes</button>
+    </form>
   </div>
-  <div class="grid grid-3" style="margin-top:1rem">
+
+  <div class="grid grid-3" style="margin-top:1.5rem">
     <div class="card metric"><span class="muted">Requests today</span><strong>{{ usage.requests_today if usage else 0 }}</strong><span class="muted">Limit {{ current_plan.daily_requests if current_plan else 1000 }}</span></div>
     <div class="card metric"><span class="muted">Tokens left</span><strong>{{ "{:,}".format((current_plan.monthly_tokens if current_plan else 250000) - (usage.tokens_this_month if usage else 0)) }}</strong><span class="muted">{{ "{:,}".format(usage.tokens_this_month if usage else 0) }} used</span></div>
     <div class="card metric"><span class="muted">AI credits</span><strong>{{ usage.credits_this_month if usage else 0 }}</strong><span class="muted">{{ current_plan.monthly_credits if current_plan else 0 }} included</span></div>

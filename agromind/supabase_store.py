@@ -263,10 +263,19 @@ def save_output(
     if not key:
         return
     try:
-        httpx.post(_rest_url("ai_outputs"), headers=_rest_headers(key, access_token), json=output_row, timeout=20)
-        httpx.post(_rest_url("usage_events"), headers=_rest_headers(key, access_token), json=usage_row, timeout=20)
-    except Exception:
-        pass
+        r1 = httpx.post(_rest_url("ai_outputs"), headers=_rest_headers(key, access_token), json=output_row, timeout=20)
+        r1.raise_for_status()
+    except Exception as exc:
+        print(f"Error saving to ai_outputs via REST: {exc}")
+        if 'r1' in locals():
+            print(f"ai_outputs error response: {r1.status_code} - {r1.text}")
+    try:
+        r2 = httpx.post(_rest_url("usage_events"), headers=_rest_headers(key, access_token), json=usage_row, timeout=20)
+        r2.raise_for_status()
+    except Exception as exc:
+        print(f"Error saving to usage_events via REST: {exc}")
+        if 'r2' in locals():
+            print(f"usage_events error response: {r2.status_code} - {r2.text}")
 
 
 def fetch_recent_outputs(user_id: str | None = None, limit: int = 5, access_token: str | None = None) -> list[dict]:
@@ -368,9 +377,23 @@ def _parse_time(value: str | None) -> datetime | None:
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
+        # Normalize format for multi-python version compatibility
+        s = value.replace(" ", "T").replace("Z", "+00:00")
+        plus_idx = s.rfind("+")
+        minus_idx = s.rfind("-")
+        idx = max(plus_idx, minus_idx)
+        if idx > 10:
+            tz_part = s[idx:]
+            if ":" not in tz_part:
+                s = s[:idx] + tz_part + ":00"
+        return datetime.fromisoformat(s).astimezone(UTC)
     except Exception:
-        return None
+        try:
+            # Resilient naive substring fallback
+            s = value.replace(" ", "T")
+            return datetime.fromisoformat(s[:19]).replace(tzinfo=UTC)
+        except Exception:
+            return None
 
 
 def fetch_profile(user_id: str | None, access_token: str | None = None) -> dict | None:
@@ -437,6 +460,29 @@ def update_profile_plan(user_id: str | None, plan: str, access_token: str | None
         httpx.patch(_rest_url("profiles", f"id=eq.{quote(user_id)}"), headers=_rest_headers(key, access_token), json=row, timeout=20)
     except Exception:
         pass
+
+
+def update_profile(user_id: str | None, profile_data: dict, access_token: str | None = None) -> None:
+    if not user_id:
+        return
+    row = {**profile_data, "updated_at": datetime.now(UTC).isoformat()}
+    client = supabase_client()
+    if client:
+        try:
+            client.table("profiles").update(row).eq("id", user_id).execute()
+            return
+        except Exception as e:
+            raise e
+    key = _database_key()
+    if not key:
+        raise RuntimeError("Supabase credentials are not configured.")
+    response = httpx.patch(
+        _rest_url("profiles", f"id=eq.{quote(user_id)}"),
+        headers=_rest_headers(key, access_token),
+        json=row,
+        timeout=20,
+    )
+    response.raise_for_status()
 
 
 def save_payment(
