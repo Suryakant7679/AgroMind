@@ -547,11 +547,40 @@ async def voice_assistant(
     verify_csrf(request, csrf_token)
 
     selected_language = resolve_response_language(query, language)
+
+    # 1. Personalize with the user's name from database profile or session/email
+    user_name = "User"
+    email = user_or_response.get("email", "")
+    try:
+        profile_data = fetch_profile(user_or_response.get("id"), user_or_response.get("access_token"))
+        if profile_data and profile_data.get("full_name"):
+            user_name = profile_data.get("full_name").split(" ")[0]
+    except Exception:
+        pass
+    if user_name == "User" and email:
+        user_name = email.split("@")[0].capitalize()
+
+    # 2. Retrieve conversational history from session (short-term memory)
+    chat_history = request.session.get("voice_chat_history", [])
+    # Limit to the last 10 messages (5 exchange pairs) to strictly prevent cookie bloat
+    chat_history = chat_history[-10:]
+
+    # 3. Create context-aware, personalized, and language-adaptive system prompt
     system_prompt = (
-        "You are the voice assistant for AgroMind, a multi-domain AI platform for agriculture, healthcare, and education. "
-        "Keep your response brief, friendly, highly conversational, and direct (max 2-3 sentences) because it will be spoken "
-        "out loud by text-to-speech. Maintain professional, highly accurate, and helpful domain knowledge. "
-        f"Respond in {selected_language['name']}."
+        f"You are the intelligent, conversational voice and chat assistant for AgroMind, named AgroMind AI. "
+        f"The current user's name is {user_name}. "
+        "AgroMind is a multi-domain AI platform for agriculture, healthcare, and education. "
+        "Your available capabilities and dashboard tools are:\n"
+        "- Agriculture AI: Crop recommendation/planning, plant health inspector (photos of plants), farm operations, market intelligence.\n"
+        "- Healthcare AI: Symptom checker, wellness coaching, medical report analysis, medicine safety support, skin analyzer.\n"
+        "- Education AI: Notes, worksheets, MCQs, tutoring, grading essays, and YouTube study tools (extracts transcripts from YouTube links to make summary notes).\n\n"
+        "Directives:\n"
+        "1. Keep your reply extremely brief, friendly, highly conversational, and direct (max 2-3 sentences) because it will be spoken out loud by text-to-speech.\n"
+        "2. If the user asks you to perform a complex action (e.g., analyze a plant disease picture, check skin disease, summarize a youtube video, or grade an essay), "
+        "politely guide them to navigate to that specific dedicated tool in their AgroMind Dashboard.\n"
+        f"3. Speak directly to {user_name} when appropriate.\n"
+        f"4. CRITICAL: Always respond in the EXACT same language as the user's prompt (even if the user queries in romanized/mixed script like Hinglish or Spanglish). "
+        f"Align perfectly with their tone and language. Default to {selected_language['name']} if the query language is ambiguous."
     )
 
     try:
@@ -562,23 +591,27 @@ async def voice_assistant(
                 base_url="https://api.groq.com/openai/v1",
                 timeout=45,
             )
+            messages = [{"role": "system", "content": system_prompt}]
+            for msg in chat_history:
+                messages.append({"role": msg["role"], "content": msg["content"]})
+            messages.append({"role": "user", "content": query})
+
             completion = client.chat.completions.create(
                 model=default_groq_model("multilingual"),
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": query},
-                ],
+                messages=messages,
             )
             response_text = completion.choices[0].message.content or ""
         elif os.getenv("OPENAI_API_KEY"):
             from openai import OpenAI
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=45)
+            messages = [{"role": "system", "content": system_prompt}]
+            for msg in chat_history:
+                messages.append({"role": msg["role"], "content": msg["content"]})
+            messages.append({"role": "user", "content": query})
+
             completion = client.chat.completions.create(
                 model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": query},
-                ],
+                messages=messages,
             )
             response_text = completion.choices[0].message.content or ""
         elif os.getenv("GEMINI_API_KEY"):
@@ -587,12 +620,25 @@ async def voice_assistant(
             from agromind.ai import gemini_model_candidates
             model_name = gemini_model_candidates()[0]
             model = genai.GenerativeModel(model_name)
-            result = model.generate_content(f"{system_prompt}\n\nUser Question: {query}", request_options={"timeout": 45})
+            
+            # Format conversational history as natural dialogue for Gemini's text mode
+            payload = f"{system_prompt}\n\n"
+            for msg in chat_history:
+                role = "User" if msg["role"] == "user" else "Assistant"
+                payload += f"{role}: {msg['content']}\n"
+            payload += f"User: {query}\nAssistant:"
+
+            result = model.generate_content(payload, request_options={"timeout": 45})
             response_text = result.text or ""
         else:
             response_text = "I am ready to help, but no AI providers are currently configured. Please configure your API keys."
     except Exception as exc:
         response_text = f"Sorry, I encountered an error while processing your request: {str(exc)}"
+
+    # 4. Record interaction in short-term session chat history
+    chat_history.append({"role": "user", "content": query})
+    chat_history.append({"role": "assistant", "content": response_text})
+    request.session["voice_chat_history"] = chat_history[-10:]
 
     return {"response": response_text, "language": selected_language["code"]}
 
