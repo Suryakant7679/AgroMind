@@ -142,7 +142,7 @@ def sign_up_with_password(email: str, password: str, full_name: str = "") -> dic
         raise RuntimeError("Signup failed. This email may already exist or signup may be disabled.")
 
     payload = response.json()
-    user = payload.get("user") or {}
+    user = payload.get("user") or payload
     if not user.get("id") or not user.get("email"):
         raise RuntimeError("Supabase did not return a user.")
     return {"id": user["id"], "email": user["email"], "access_token": payload.get("access_token")}
@@ -181,7 +181,7 @@ def verify_signup_otp(email: str, token: str) -> dict:
         raise RuntimeError(err_msg)
 
     payload = response.json()
-    user = payload.get("user") or {}
+    user = payload.get("user") or payload
     if not user.get("id") or not user.get("email"):
         raise RuntimeError("Supabase did not return a user.")
     return {"id": user["id"], "email": user["email"], "access_token": payload.get("access_token")}
