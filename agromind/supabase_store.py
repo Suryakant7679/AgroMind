@@ -110,17 +110,20 @@ def sign_in_with_password(email: str, password: str) -> dict:
 def sign_up_with_password(email: str, password: str, full_name: str = "") -> dict:
     client = supabase_auth_client()
     if client:
-        result = client.auth.sign_up(
-            {
-                "email": email,
-                "password": password,
-                "options": {"data": {"full_name": full_name or "AgroMind User"}},
-            }
-        )
-        if not result.user:
-            raise RuntimeError("Signup did not return a user.")
-        access_token = result.session.access_token if result.session else None
-        return {"id": result.user.id, "email": result.user.email, "access_token": access_token}
+        try:
+            result = client.auth.sign_up(
+                {
+                    "email": email,
+                    "password": password,
+                    "options": {"data": {"full_name": full_name or "AgroMind User"}},
+                }
+            )
+            user_id = result.user.id if (result and result.user) else None
+            user_email = result.user.email if (result and result.user) else email
+            access_token = result.session.access_token if (result and result.session) else None
+            return {"id": user_id, "email": user_email, "access_token": access_token}
+        except Exception as e:
+            raise RuntimeError(str(e))
 
     url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
     key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
@@ -139,13 +142,20 @@ def sign_up_with_password(email: str, password: str, full_name: str = "") -> dic
         timeout=20,
     )
     if response.status_code >= 400:
-        raise RuntimeError("Signup failed. This email may already exist or signup may be disabled.")
+        try:
+            err_msg = response.json().get("error_description") or response.json().get("msg") or "Signup failed."
+        except Exception:
+            err_msg = "Signup failed."
+        raise RuntimeError(err_msg)
 
     payload = response.json()
     user = payload.get("user") or payload
-    if not user.get("id") or not user.get("email"):
-        raise RuntimeError("Supabase did not return a user.")
-    return {"id": user["id"], "email": user["email"], "access_token": payload.get("access_token")}
+    user_id = None
+    user_email = email
+    if isinstance(user, dict):
+        user_id = user.get("id")
+        user_email = user.get("email") or email
+    return {"id": user_id, "email": user_email, "access_token": payload.get("access_token") if isinstance(payload, dict) else None}
 
 
 def verify_signup_otp(email: str, token: str) -> dict:
