@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="card" style="max-width:30rem;margin:4rem auto;padding:2.5rem;box-shadow:0 10px 30px rgba(0,0,0,0.25);border-radius:12px;background:rgba(30, 30, 30, 0.6);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.05)">
+    <h1 style="margin-bottom:0.5rem;font-size:1.85rem;font-weight:700;background:linear-gradient(135deg, #10b981 0%, #3b82f6 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Verify Your Account</h1>
+    <p class="muted" style="margin-bottom:2rem;font-size:0.95rem">We have sent a 6-digit OTP code to your email. Please enter it below to complete your registration.</p>
+    
+    {% if message %}
+      <div style="background:rgba(239, 68, 68, 0.1);border:1px solid rgba(239, 68, 68, 0.2);color:#ef4444;padding:0.75rem 1rem;border-radius:6px;margin-bottom:1.5rem;font-size:0.9rem">
+        {{ message }}
+      </div>
+    {% endif %}
+    
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="next" value="{{ next }}">
+      
+      <div class="form-row" style="margin-bottom:1.5rem">
+        <label style="display:block;margin-bottom:0.5rem;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.6)">Email Address</label>
+        <input name="email" type="email" required value="{{ email or '' }}" placeholder="user@example.com" style="width:100%;padding:0.75rem 1rem;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.2);color:#fff">
+      </div>
+      
+      <div class="form-row" style="margin-bottom:2rem">
+        <label style="display:block;margin-bottom:0.5rem;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.6)">Verification Code</label>
+        <input name="token" type="text" required pattern="[0-9]{6}" maxlength="6" placeholder="000000" autofocus autocomplete="one-time-code" style="width:100%;padding:0.9rem;border-radius:6px;border:1px solid rgba(16, 185, 129, 0.3);background:rgba(16, 185, 129, 0.05);color:#fff;font-size:1.75rem;font-weight:700;text-align:center;letter-spacing:0.4em;box-shadow:0 0 10px rgba(16, 185, 129, 0.1)">
+      </div>
+      
+      <button class="button" type="submit" style="width:100%;padding:0.85rem;font-size:1rem;font-weight:600;background:linear-gradient(135deg, #10b981 0%, #059669 100%);border:none;box-shadow:0 4px 12px rgba(16, 185, 129, 0.3);transition:transform 0.2s, box-shadow 0.2s">Verify & Continue</button>
+    </form>
+    
+    <div style="margin-top:2rem;text-align:center;border-top:1px solid rgba(255,255,255,0.05);padding-top:1.5rem">
+      <p class="muted" style="font-size:0.85rem;margin:0">Didn't receive the email? Check your spam folder or <a href="/signup" style="color:#10b981;text-decoration:none;font-weight:500">try signing up again</a>.</p>
+    </div>
+  </div>
+{% endblock %}

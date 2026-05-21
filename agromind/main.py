@@ -44,6 +44,7 @@ from agromind.supabase_store import (
     supabase_database_configured,
     update_profile_plan,
     usage_summary,
+    verify_signup_otp,
 )
 
 load_dotenv(".env.local")
@@ -381,14 +382,45 @@ async def signup_submit(
         user = sign_up_with_password(email, password, full_name)
         if user.get("id") and user.get("email"):
             insert_profile_if_missing(user["id"], user["email"], full_name)
-        return page(
-            request,
-            "login.html",
-            next=next,
-            message="Account created. Check your email for the Supabase verification link, then log in.",
-        )
+        request.session["signup_email"] = email
+        request.session["signup_full_name"] = full_name
+        request.session["signup_next"] = next
+        return RedirectResponse("/verify-otp", status_code=303)
     except Exception as exc:
         return page(request, "signup.html", next=next, message=str(exc))
+
+
+@app.get("/verify-otp", response_class=HTMLResponse)
+def verify_otp_page(request: Request):
+    email = request.session.get("signup_email", "")
+    next_dest = request.session.get("signup_next", "/dashboard")
+    return page(request, "verify_otp.html", email=email, next=next_dest, message=None)
+
+
+@app.post("/verify-otp", response_class=HTMLResponse)
+async def verify_otp_submit(
+    request: Request,
+    email: str = Form(...),
+    token: str = Form(...),
+    csrf_token: str = Form(...),
+    next: str = Form("/dashboard"),
+):
+    verify_csrf(request, csrf_token)
+    next = safe_next(next)
+    full_name = request.session.get("signup_full_name", "")
+    try:
+        user = verify_signup_otp(email, token)
+        if user.get("id") and user.get("email"):
+            insert_profile_if_missing(user["id"], user["email"], full_name)
+            request.session["user"] = user
+            request.session.pop("signup_email", None)
+            request.session.pop("signup_full_name", None)
+            request.session.pop("signup_next", None)
+            return RedirectResponse(next, status_code=303)
+        else:
+            raise RuntimeError("Verification succeeded but did not return a valid user.")
+    except Exception as exc:
+        return page(request, "verify_otp.html", email=email, next=next, message=str(exc))
 
 
 @app.get("/logout")

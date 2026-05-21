@@ -148,6 +148,45 @@ def sign_up_with_password(email: str, password: str, full_name: str = "") -> dic
     return {"id": user["id"], "email": user["email"], "access_token": payload.get("access_token")}
 
 
+def verify_signup_otp(email: str, token: str) -> dict:
+    client = supabase_auth_client()
+    if client:
+        result = client.auth.verify_otp({"email": email, "token": token, "type": "signup"})
+        if not result.user:
+            raise RuntimeError("Verification did not return a user.")
+        access_token = result.session.access_token if result.session else None
+        return {"id": result.user.id, "email": result.user.email, "access_token": access_token}
+
+    url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
+    key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
+    if not url or not key:
+        raise RuntimeError("Supabase auth is not configured.")
+
+    endpoint = f"{url.rstrip('/')}/auth/v1/verify"
+    response = httpx.post(
+        endpoint,
+        headers={"apikey": key, "Authorization": f"Bearer {key}"},
+        json={
+            "type": "signup",
+            "email": email,
+            "token": token,
+        },
+        timeout=20,
+    )
+    if response.status_code >= 400:
+        try:
+            err_msg = response.json().get("error_description") or response.json().get("msg") or "Verification failed."
+        except Exception:
+            err_msg = "Verification failed."
+        raise RuntimeError(err_msg)
+
+    payload = response.json()
+    user = payload.get("user") or {}
+    if not user.get("id") or not user.get("email"):
+        raise RuntimeError("Supabase did not return a user.")
+    return {"id": user["id"], "email": user["email"], "access_token": payload.get("access_token")}
+
+
 def insert_profile_if_missing(user_id: str, email: str, full_name: str = "") -> None:
     client = supabase_client()
     row = {
