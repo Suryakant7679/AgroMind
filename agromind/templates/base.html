@@ -59,32 +59,51 @@
     <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar(event)"></div>
 
     {% if user %}
-    <!-- Floating Voice Assistant Widget -->
+    <!-- Floating Voice/Chat Assistant Widget -->
     <div class="voice-assistant-container" id="voice-assistant">
-      <div class="voice-panel" id="voice-panel">
-        <div class="voice-header">
-          <h3>🎙️ AgroMind Voice Assistant</h3>
+      <div class="voice-panel" id="voice-panel" style="width: 360px; height: 480px;">
+        <div class="voice-header" style="background: linear-gradient(135deg, var(--primary), #0284c7); padding: 0.95rem 1.1rem; display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <img src="/static/robot_avatar.jpg" alt="AgroMind Robot" style="width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid white; object-fit: cover;">
+            <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; letter-spacing: -0.01em;">AgroMind AI Assistant</h3>
+          </div>
           <button class="voice-close-btn" onclick="toggleVoicePanel(event)">✕</button>
         </div>
         <div class="voice-body" id="voice-chat-history">
           <div class="voice-msg assistant">
-            Hello! I am your AgroMind voice assistant. Click the microphone below and speak to ask me anything.
+            Hello! I am your AgroMind AI assistant. You can type your message below to chat, or click the microphone to speak!
           </div>
         </div>
-        <div class="voice-footer">
-          <div class="voice-visualizer" id="voice-visualizer">
-            <div class="voice-bar"></div>
-            <div class="voice-bar"></div>
-            <div class="voice-bar"></div>
-            <div class="voice-bar"></div>
-            <div class="voice-bar"></div>
+        <div class="voice-footer" style="padding: 0.75rem 1rem; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 0.5rem; background: var(--panel);">
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <div class="voice-visualizer" id="voice-visualizer" style="height: 16px;">
+              <div class="voice-bar"></div>
+              <div class="voice-bar"></div>
+              <div class="voice-bar"></div>
+              <div class="voice-bar"></div>
+              <div class="voice-bar"></div>
+            </div>
+            <span class="voice-status-text" id="voice-status" style="font-size: 0.68rem; font-weight: 700; color: var(--muted); text-transform: uppercase;">Idle</span>
           </div>
-          <span class="voice-status-text" id="voice-status">Idle</span>
-          <button class="voice-trigger-btn" id="voice-mic-btn" onclick="toggleVoiceCapture(event)">🎙️</button>
+          
+          <div class="voice-input-row" style="display: flex; align-items: center; width: 100%; gap: 8px;">
+            <!-- Text Input -->
+            <input type="text" id="voice-chat-input" placeholder="Type a message..." onkeydown="handleVoiceChatKey(event)" style="flex: 1; padding: 0.55rem 0.8rem; border-radius: 999px; border: 1px solid var(--line); background: rgba(0,0,0,0.03); color: var(--text); font-size: 0.85rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--line)'">
+            
+            <!-- Send Button -->
+            <button id="voice-send-btn" onclick="sendVoiceChatMessage(event)" style="background: var(--primary); color: white; border: none; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 8px rgba(15, 118, 110, 0.2); transition: transform 0.2s; font-size: 1rem; outline: none; flex-shrink: 0;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+              ➔
+            </button>
+            
+            <!-- Mic Button (using mic_icon.jpg) -->
+            <button class="voice-trigger-btn" id="voice-mic-btn" onclick="toggleVoiceCapture(event)" style="width: 36px; height: 36px; min-width: 36px; padding: 0; overflow: hidden; background: none; border: 1px solid rgba(15, 118, 110, 0.2); border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+              <img src="/static/mic_icon.jpg" alt="Mic" id="voice-mic-img" style="width: 100%; height: 100%; object-fit: cover;">
+            </button>
+          </div>
         </div>
       </div>
-      <button class="voice-trigger-btn" id="voice-panel-trigger" onclick="toggleVoicePanel(event)" title="Talk to AgroMind">
-        🎙️
+      <button class="voice-trigger-btn" id="voice-panel-trigger" onclick="toggleVoicePanel(event)" title="Talk to AgroMind" style="padding: 0; overflow: hidden; background: none; border: 2.5px solid var(--primary); width: 60px; height: 60px; box-shadow: 0 4px 20px rgba(15, 118, 110, 0.45); cursor: pointer;" onmouseover="this.querySelector('img').style.transform='scale(1.08)'" onmouseout="this.querySelector('img').style.transform='scale(1)'">
+        <img src="/static/robot_avatar.jpg" alt="AgroMind Assistant" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease;">
       </button>
     </div>
     {% endif %}
@@ -340,7 +359,10 @@
           const micBtn = document.createElement("button");
           micBtn.type = "button";
           micBtn.className = "speech-mic-btn";
-          micBtn.innerHTML = "🎙️";
+          micBtn.style.padding = "0";
+          micBtn.style.overflow = "hidden";
+          micBtn.style.border = "1px solid rgba(15, 118, 110, 0.15)";
+          micBtn.innerHTML = `<img src="/static/mic_icon.jpg" alt="Mic" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; transition: filter 0.2s;">`;
           micBtn.title = "Speak to type";
           wrapper.appendChild(micBtn);
 
@@ -554,6 +576,73 @@
         };
 
         assistantRecognition.start();
+      }
+
+      async function sendVoiceChatMessage(e) {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        const inputEl = document.getElementById("voice-chat-input");
+        if (!inputEl) return;
+        const queryText = inputEl.value.trim();
+        if (!queryText) return;
+
+        inputEl.value = "";
+        appendAssistantMessage(queryText, true);
+
+        const visualizer = document.getElementById("voice-visualizer");
+        const status = document.getElementById("voice-status");
+
+        if (window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+          if (visualizer) visualizer.classList.remove("speaking");
+        }
+
+        if (status) status.textContent = "Processing...";
+        if (visualizer) visualizer.classList.add("listening");
+
+        try {
+          const formData = new FormData();
+          formData.append("query", queryText);
+          formData.append("csrf_token", globalCsrfToken);
+          formData.append("language", currentLanguage());
+
+          const response = await fetch("/api/voice-assistant", {
+            method: "POST",
+            body: formData
+          });
+
+          if (!response.ok) {
+            throw new Error("Network response error");
+          }
+
+          const data = await response.json();
+          const reply = data.response;
+          const replyLanguage = data.language || currentLanguage();
+
+          appendAssistantMessage(reply, false);
+          if (visualizer) visualizer.classList.remove("listening");
+
+          if (status) status.textContent = "Speaking...";
+          if (visualizer) visualizer.classList.add("speaking");
+          speakText(reply, null, () => {
+            if (visualizer) visualizer.classList.remove("speaking");
+            if (status) status.textContent = "Idle";
+          }, replyLanguage);
+        } catch (err) {
+          console.error("Voice Assistant Request Failed:", err);
+          appendAssistantMessage("Sorry, I had trouble reaching the AI. Please try again.", false);
+          if (visualizer) visualizer.classList.remove("listening");
+          if (status) status.textContent = "Idle";
+        }
+      }
+
+      function handleVoiceChatKey(e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          sendVoiceChatMessage(e);
+        }
       }
     </script>
   </body>
