@@ -217,36 +217,33 @@ def sign_up_with_password(email: str, password: str, full_name: str = "", redire
 
 
 def send_signup_otp(email: str, full_name: str = "", redirect_to: str | None = None) -> None:
-    client = supabase_auth_client()
-    if client:
-        try:
-            options = {"should_create_user": True, "data": {"full_name": full_name or "AgroMind User", "verification_method": "otp"}}
-            if redirect_to:
-                options["email_redirect_to"] = redirect_to
-            client.auth.sign_in_with_otp({"email": email, "options": options})
-            return
-        except Exception as e:
-            raise RuntimeError(str(e))
-
-    url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
-    key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
+    url = _supabase_url()
+    key = _anon_key()
     if not url or not key:
         raise RuntimeError("Supabase auth is not configured.")
 
     endpoint = f"{url.rstrip('/')}/auth/v1/otp"
     if redirect_to:
         endpoint = f"{endpoint}?redirect_to={quote(redirect_to, safe='')}"
-    headers = {"apikey": key}
+    headers = {"apikey": key, "Content-Type": "application/json"}
     if key.startswith("eyJ"):
         headers["Authorization"] = f"Bearer {key}"
+
+    payload = {
+        "email": email,
+        "create_user": True,
+        "data": {"full_name": full_name or "AgroMind User", "verification_method": "otp"},
+        "options": {
+            "data": {"full_name": full_name or "AgroMind User", "verification_method": "otp"}
+        }
+    }
+    if redirect_to:
+        payload["options"]["email_redirect_to"] = redirect_to
+
     response = httpx.post(
         endpoint,
         headers=headers,
-        json={
-            "email": email,
-            "create_user": True,
-            "data": {"full_name": full_name or "AgroMind User", "verification_method": "otp"},
-        },
+        json=payload,
         timeout=20,
     )
     if response.status_code >= 400:
