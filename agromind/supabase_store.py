@@ -161,7 +161,7 @@ def sign_up_with_password(email: str, password: str, full_name: str = "", redire
     client = supabase_auth_client()
     if client:
         try:
-            options = {"data": {"full_name": full_name or "AgroMind User"}}
+            options = {"data": {"full_name": full_name or "AgroMind User", "verification_method": "link"}}
             if redirect_to:
                 options["email_redirect_to"] = redirect_to
             result = client.auth.sign_up(
@@ -195,7 +195,7 @@ def sign_up_with_password(email: str, password: str, full_name: str = "", redire
         json={
             "email": email,
             "password": password,
-            "data": {"full_name": full_name or "AgroMind User"},
+            "data": {"full_name": full_name or "AgroMind User", "verification_method": "link"},
         },
         timeout=20,
     )
@@ -220,7 +220,7 @@ def send_signup_otp(email: str, full_name: str = "", redirect_to: str | None = N
     client = supabase_auth_client()
     if client:
         try:
-            options = {"should_create_user": True, "data": {"full_name": full_name or "AgroMind User"}}
+            options = {"should_create_user": True, "data": {"full_name": full_name or "AgroMind User", "verification_method": "otp"}}
             if redirect_to:
                 options["email_redirect_to"] = redirect_to
             client.auth.sign_in_with_otp({"email": email, "options": options})
@@ -245,7 +245,7 @@ def send_signup_otp(email: str, full_name: str = "", redirect_to: str | None = N
         json={
             "email": email,
             "create_user": True,
-            "data": {"full_name": full_name or "AgroMind User"},
+            "data": {"full_name": full_name or "AgroMind User", "verification_method": "otp"},
         },
         timeout=20,
     )
