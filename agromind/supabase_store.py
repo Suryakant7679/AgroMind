@@ -260,11 +260,23 @@ def send_signup_otp(email: str, full_name: str = "", redirect_to: str | None = N
 def verify_signup_otp(email: str, token: str, otp_type: str = "signup") -> dict:
     client = supabase_auth_client()
     if client:
-        result = client.auth.verify_otp({"email": email, "token": token, "type": otp_type})
-        if not result.user:
-            raise RuntimeError("Verification did not return a user.")
-        access_token = result.session.access_token if result.session else None
-        return {"id": result.user.id, "email": result.user.email, "access_token": access_token}
+        try:
+            result = client.auth.verify_otp({"email": email, "token": token, "type": otp_type})
+            if not result.user:
+                raise RuntimeError("Verification did not return a user.")
+            access_token = result.session.access_token if result.session else None
+            return {"id": result.user.id, "email": result.user.email, "access_token": access_token}
+        except Exception as e:
+            if otp_type in {"magiclink", "email"}:
+                fallback_type = "email" if otp_type == "magiclink" else "magiclink"
+                try:
+                    result = client.auth.verify_otp({"email": email, "token": token, "type": fallback_type})
+                    if result.user:
+                        access_token = result.session.access_token if result.session else None
+                        return {"id": result.user.id, "email": result.user.email, "access_token": access_token}
+                except Exception:
+                    pass
+            raise RuntimeError(str(e))
 
     url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
     key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
@@ -275,16 +287,26 @@ def verify_signup_otp(email: str, token: str, otp_type: str = "signup") -> dict:
     headers = {"apikey": key}
     if key.startswith("eyJ"):
         headers["Authorization"] = f"Bearer {key}"
-    response = httpx.post(
-        endpoint,
-        headers=headers,
-        json={
-            "type": otp_type,
-            "email": email,
-            "token": token,
-        },
-        timeout=20,
-    )
+
+    def do_post(t):
+        return httpx.post(
+            endpoint,
+            headers=headers,
+            json={
+                "type": t,
+                "email": email,
+                "token": token,
+            },
+            timeout=20,
+        )
+
+    response = do_post(otp_type)
+    if response.status_code >= 400 and otp_type in {"magiclink", "email"}:
+        fallback_type = "email" if otp_type == "magiclink" else "magiclink"
+        fb_response = do_post(fallback_type)
+        if fb_response.status_code < 400:
+            response = fb_response
+
     if response.status_code >= 400:
         try:
             err_msg = response.json().get("error_description") or response.json().get("msg") or "Verification failed."
@@ -297,6 +319,102 @@ def verify_signup_otp(email: str, token: str, otp_type: str = "signup") -> dict:
     if not user.get("id") or not user.get("email"):
         raise RuntimeError("Supabase did not return a user.")
     return {"id": user["id"], "email": user["email"], "access_token": payload.get("access_token")}
+
+
+def verify_email_token_hash(token_hash: str, verify_type: str = "email") -> dict:
+    """Exchange a Supabase email confirmation token_hash for a user session."""
+    url = _supabase_url()
+    key = _anon_key()
+    if not url or not key:
+        raise RuntimeError("Supabase auth is not configured.")
+
+    endpoint = f"{url.rstrip('/')}/auth/v1/verify"
+    headers = {"apikey": key}
+    if key.startswith("eyJ"):
+        headers["Authorization"] = f"Bearer {key}"
+    response = httpx.post(
+        endpoint,
+        headers=headers,
+        json={"type": verify_type, "token_hash": token_hash},
+        timeout=20,
+    )
+    if response.status_code >= 400:
+        try:
+            err = response.json()
+            err_msg = err.get("error_description") or err.get("msg") or "Token verification failed."
+        except Exception:
+            err_msg = "Token verification failed."
+        raise RuntimeError(err_msg)
+
+    payload = response.json()
+    user = payload.get("user") or {}
+    if not user.get("id") or not user.get("email"):
+        raise RuntimeError("Verification succeeded but no user returned.")
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "access_token": payload.get("access_token"),
+    }
+
+
+def resend_signup_otp(email: str) -> None:
+    """Resend a signup confirmation OTP for an already-registered (unconfirmed) user."""
+    url = _supabase_url()
+    key = _anon_key()
+    if not url or not key:
+        raise RuntimeError("Supabase auth is not configured.")
+
+    endpoint = f"{url.rstrip('/')}/auth/v1/resend"
+    headers = {"apikey": key, "Content-Type": "application/json"}
+    if key.startswith("eyJ"):
+        headers["Authorization"] = f"Bearer {key}"
+    response = httpx.post(
+        endpoint,
+        headers=headers,
+        json={"type": "signup", "email": email},
+        timeout=20,
+    )
+    if response.status_code >= 400:
+        try:
+            err_msg = (
+                response.json().get("error_description")
+                or response.json().get("msg")
+                or "Could not resend verification code."
+            )
+        except Exception:
+            err_msg = "Could not resend verification code."
+        raise RuntimeError(err_msg)
+
+
+def update_user_password(access_token: str, password: str) -> None:
+    """Set or update the password for the currently authenticated user using their access token."""
+    url = _supabase_url()
+    key = _anon_key()
+    if not url or not key:
+        raise RuntimeError("Supabase auth is not configured.")
+
+    endpoint = f"{url.rstrip('/')}/auth/v1/user"
+    headers = {
+        "apikey": key,
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+    response = httpx.put(
+        endpoint,
+        headers=headers,
+        json={"password": password},
+        timeout=20,
+    )
+    if response.status_code >= 400:
+        try:
+            err_msg = (
+                response.json().get("error_description")
+                or response.json().get("msg")
+                or "Failed to set password."
+            )
+        except Exception:
+            err_msg = "Failed to set password."
+        raise RuntimeError(err_msg)
 
 
 def insert_profile_if_missing(user_id: str, email: str, full_name: str = "") -> None:

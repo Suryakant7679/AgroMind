@@ -34,6 +34,7 @@ from agromind.supabase_store import (
     fetch_profiles,
     fetch_recent_outputs,
     insert_profile_if_missing,
+    resend_signup_otp,
     save_payment,
     save_output,
     save_subscription,
@@ -45,7 +46,9 @@ from agromind.supabase_store import (
     supabase_database_configured,
     update_profile_plan,
     update_profile,
+    update_user_password,
     usage_summary,
+    verify_email_token_hash,
     verify_signup_otp,
 )
 
@@ -400,8 +403,15 @@ async def login_submit(
         try:
             request.session["user"] = sign_in_with_password(email, password)
             return RedirectResponse(next, status_code=303)
-        except Exception:
-            return page(request, "login.html", next=next, message="Login failed. Check your email and password.")
+        except Exception as exc:
+            error_msg = str(exc)
+            if "email not confirmed" in error_msg.lower():
+                error_msg = "Your email is not yet confirmed. Please check your inbox for the verification link."
+            elif "invalid" in error_msg.lower():
+                error_msg = "Invalid email or password. Please try again."
+            else:
+                error_msg = f"Login failed: {error_msg}"
+            return page(request, "login.html", next=next, message=error_msg)
 
     if os.getenv("ALLOW_DEMO_LOGIN", "").lower() == "true":
         request.session["user"] = {"id": None, "email": email}
@@ -441,21 +451,26 @@ async def signup_submit(
     try:
         confirmation_url = f"{request.url_for('auth_confirmed')}?next={quote(next)}"
         verification_method = verification_method if verification_method in {"link", "otp"} else "link"
-        user = {}
-        if verification_method == "otp":
-            send_signup_otp(email, full_name, confirmation_url)
-        else:
-            user = sign_up_with_password(email, password, full_name, confirmation_url)
-            if user.get("id") and user.get("email"):
-                insert_profile_if_missing(user["id"], user["email"], full_name)
+
         request.session["signup_email"] = email
         request.session["signup_full_name"] = full_name
         request.session["signup_next"] = next
         request.session["signup_verification_method"] = verification_method
+
         if verification_method == "otp":
-            request.session["signup_otp_type"] = "email"
+            # For OTP method, we temporarily save the password in the session.
+            # We trigger the OTP (magiclink type) to create/verify the user.
+            # Once verified, we will set/upgrade their password.
+            request.session["signup_password"] = password
+            send_signup_otp(email, full_name)
+            request.session["signup_otp_type"] = "magiclink"
             return RedirectResponse("/verify-otp", status_code=303)
-        return RedirectResponse("/check-email", status_code=303)
+        else:
+            # For Link method, we register with password first
+            user = sign_up_with_password(email, password, full_name, confirmation_url)
+            if user.get("id") and user.get("email"):
+                insert_profile_if_missing(user["id"], user["email"], full_name)
+            return RedirectResponse("/check-email", status_code=303)
     except Exception as exc:
         return page(request, "signup.html", next=next, message=str(exc))
 
@@ -493,16 +508,22 @@ async def verify_otp_submit(
     next = safe_next(next)
     full_name = request.session.get("signup_full_name", "")
     otp_type = request.session.get("signup_otp_type", "signup")
+    signup_password = request.session.get("signup_password", "")
     try:
         user = verify_signup_otp(email, token, otp_type)
         if user.get("id") and user.get("email"):
+            # Set the password using their access token if they verified via OTP
+            if signup_password and user.get("access_token"):
+                update_user_password(user["access_token"], signup_password)
+
             insert_profile_if_missing(user["id"], user["email"], full_name)
             request.session["user"] = user
-            request.session.pop("signup_email", None)
-            request.session.pop("signup_full_name", None)
-            request.session.pop("signup_next", None)
-            request.session.pop("signup_verification_method", None)
-            request.session.pop("signup_otp_type", None)
+            
+            # Clean up session
+            for key in ("signup_email", "signup_full_name", "signup_next",
+                        "signup_verification_method", "signup_otp_type", "signup_password"):
+                request.session.pop(key, None)
+                
             return RedirectResponse(next, status_code=303)
         else:
             raise RuntimeError("Verification succeeded but did not return a valid user.")
@@ -511,12 +532,38 @@ async def verify_otp_submit(
 
 
 @app.get("/auth/confirmed", response_class=HTMLResponse)
-def auth_confirmed(request: Request, next: str = "/dashboard", error: str = "", error_description: str = ""):
+def auth_confirmed(
+    request: Request,
+    next: str = "/dashboard",
+    error: str = "",
+    error_description: str = "",
+    token_hash: str = "",
+    type: str = "",
+):
     next = safe_next(next)
     if error or error_description:
         message = error_description or error or "The confirmation link could not be verified. Please try signing up again."
         return page(request, "login.html", next=next, message=message)
 
+    # Exchange the token_hash from the confirmation link for a real session
+    if token_hash and type:
+        try:
+            user = verify_email_token_hash(token_hash, type)
+            if user.get("id") and user.get("email"):
+                full_name = request.session.get("signup_full_name", "")
+                insert_profile_if_missing(user["id"], user["email"], full_name)
+                request.session["user"] = user
+                for key in ("signup_email", "signup_full_name", "signup_next",
+                            "signup_verification_method", "signup_otp_type"):
+                    request.session.pop(key, None)
+                return RedirectResponse(next, status_code=303)
+        except Exception as exc:
+            return page(
+                request, "login.html", next=next,
+                message=f"Could not verify email automatically: {exc}. Please log in with your password.",
+            )
+
+    # Fallback: no token params — ask user to log in manually
     request.session.pop("signup_email", None)
     request.session.pop("signup_full_name", None)
     request.session.pop("signup_next", None)

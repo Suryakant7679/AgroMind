@@ -4,13 +4,13 @@
   <p class="muted" data-i18n="dashboard.subtitle">Search, launch tools, monitor usage, and review recent AI outputs.</p>
   <div class="grid grid-4" style="margin:1rem 0">
     <div class="card metric"><span class="muted" data-i18n="dashboard.toolsAvailable">Tools available</span><strong>{{ tools|length }}</strong><span class="muted" data-i18n="dashboard.acrossDomains">Across 3 AI domains</span></div>
-    <div class="card metric"><span class="muted">Requests today</span><strong>{{ usage.requests_today if usage else 0 }}</strong><span class="muted">Limit {{ current_plan.daily_requests if current_plan else 1000 }}/day</span></div>
-    <div class="card metric"><span class="muted">Tokens used</span><strong>{{ "{:,}".format(usage.tokens_this_month if usage else 0) }}</strong><span class="muted">{{ "{:,}".format((current_plan.monthly_tokens if current_plan else 250000) - (usage.tokens_this_month if usage else 0)) }} left</span></div>
+    <div class="card metric"><span class="muted" data-i18n="dashboard.requestsToday">Requests today</span><strong>{{ usage.requests_today if usage else 0 }}</strong><span class="muted"><span data-i18n="dashboard.limit">Limit</span> {{ current_plan.daily_requests if current_plan else 1000 }}/<span data-i18n="dashboard.day">day</span></span></div>
+    <div class="card metric"><span class="muted" data-i18n="dashboard.tokensUsed">Tokens used</span><strong>{{ "{:,}".format(usage.tokens_this_month if usage else 0) }}</strong><span class="muted">{{ "{:,}".format((current_plan.monthly_tokens if current_plan else 250000) - (usage.tokens_this_month if usage else 0)) }} <span data-i18n="dashboard.left">left</span></span></div>
     <div class="card metric plan-metric-card">
       <span class="muted" data-i18n="dashboard.plan">Plan</span>
       <div class="plan-display" style="display:flex; justify-content:space-between; align-items:baseline;">
         <strong>{{ current_plan.name if current_plan else "Starter" }}</strong>
-        <a class="manage-plan-link" href="/pricing" style="font-size:0.8rem; font-weight:700; color:var(--primary); text-decoration:none; transition:opacity 0.2s;">Manage Plan →</a>
+        <a class="manage-plan-link" href="/pricing" style="font-size:0.8rem; font-weight:700; color:var(--primary); text-decoration:none; transition:opacity 0.2s;" data-i18n="dashboard.managePlan">Manage Plan →</a>
       </div>
       <span class="muted plan-model-text">{{ current_plan.model_access if current_plan else "Gemini free tier" }}</span>
     </div>
@@ -19,7 +19,7 @@
     {% set token_limit = current_plan.monthly_tokens if current_plan else 250000 %}
     {% set token_used = usage.tokens_this_month if usage else 0 %}
     {% set pct = [100, ((token_used / token_limit) * 100) if token_limit else 0]|min %}
-    <div class="usage-meter-head"><strong>Monthly token usage</strong><span>{{ "{:,}".format(token_used) }} / {{ "{:,}".format(token_limit) }}</span></div>
+    <div class="usage-meter-head"><strong data-i18n="dashboard.monthlyUsage">Monthly token usage</strong><span>{{ "{:,}".format(token_used) }} / {{ "{:,}".format(token_limit) }}</span></div>
     <div class="usage-bar"><span style="width: {{ pct }}%"></span></div>
   </div>
   {% for domain in domains %}
