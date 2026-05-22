@@ -37,6 +37,7 @@ from agromind.supabase_store import (
     save_payment,
     save_output,
     save_subscription,
+    send_signup_otp,
     sign_in_with_password,
     sign_up_with_password,
     supabase_auth_configured,
@@ -52,7 +53,15 @@ load_dotenv(".env.local")
 load_dotenv()
 
 # Clean environment variables of spaces/quotes
-for env_key in ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"]:
+for env_key in [
+    "RAZORPAY_KEY_ID",
+    "RAZORPAY_KEY_SECRET",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY"
+]:
     env_val = os.getenv(env_key)
     if env_val:
         os.environ[env_key] = env_val.strip().strip("'\"")
@@ -417,6 +426,7 @@ async def signup_submit(
     full_name: str = Form(""),
     email: str = Form(...),
     password: str = Form(...),
+    verification_method: str = Form("link"),
     csrf_token: str = Form(...),
     next: str = Form("/dashboard"),
 ):
@@ -429,22 +439,46 @@ async def signup_submit(
         return page(request, "signup.html", next=next, message="Supabase auth is not configured.")
 
     try:
-        user = sign_up_with_password(email, password, full_name)
-        if user.get("id") and user.get("email"):
-            insert_profile_if_missing(user["id"], user["email"], full_name)
+        confirmation_url = f"{request.url_for('auth_confirmed')}?next={quote(next)}"
+        verification_method = verification_method if verification_method in {"link", "otp"} else "link"
+        user = {}
+        if verification_method == "otp":
+            send_signup_otp(email, full_name, confirmation_url)
+        else:
+            user = sign_up_with_password(email, password, full_name, confirmation_url)
+            if user.get("id") and user.get("email"):
+                insert_profile_if_missing(user["id"], user["email"], full_name)
         request.session["signup_email"] = email
         request.session["signup_full_name"] = full_name
         request.session["signup_next"] = next
-        return RedirectResponse("/verify-otp", status_code=303)
+        request.session["signup_verification_method"] = verification_method
+        if verification_method == "otp":
+            request.session["signup_otp_type"] = "email"
+            return RedirectResponse("/verify-otp", status_code=303)
+        return RedirectResponse("/check-email", status_code=303)
     except Exception as exc:
         return page(request, "signup.html", next=next, message=str(exc))
+
+
+@app.get("/check-email", response_class=HTMLResponse)
+def check_email_page(request: Request):
+    email = request.session.get("signup_email", "")
+    next_dest = request.session.get("signup_next", "/dashboard")
+    return page(
+        request,
+        "verify_otp.html",
+        email=email,
+        next=next_dest,
+        mode="link",
+        message=None,
+    )
 
 
 @app.get("/verify-otp", response_class=HTMLResponse)
 def verify_otp_page(request: Request):
     email = request.session.get("signup_email", "")
     next_dest = request.session.get("signup_next", "/dashboard")
-    return page(request, "verify_otp.html", email=email, next=next_dest, message=None)
+    return page(request, "verify_otp.html", email=email, next=next_dest, mode="otp", message=None)
 
 
 @app.post("/verify-otp", response_class=HTMLResponse)
@@ -458,19 +492,42 @@ async def verify_otp_submit(
     verify_csrf(request, csrf_token)
     next = safe_next(next)
     full_name = request.session.get("signup_full_name", "")
+    otp_type = request.session.get("signup_otp_type", "signup")
     try:
-        user = verify_signup_otp(email, token)
+        user = verify_signup_otp(email, token, otp_type)
         if user.get("id") and user.get("email"):
             insert_profile_if_missing(user["id"], user["email"], full_name)
             request.session["user"] = user
             request.session.pop("signup_email", None)
             request.session.pop("signup_full_name", None)
             request.session.pop("signup_next", None)
+            request.session.pop("signup_verification_method", None)
+            request.session.pop("signup_otp_type", None)
             return RedirectResponse(next, status_code=303)
         else:
             raise RuntimeError("Verification succeeded but did not return a valid user.")
     except Exception as exc:
-        return page(request, "verify_otp.html", email=email, next=next, message=str(exc))
+        return page(request, "verify_otp.html", email=email, next=next, mode="otp", message=str(exc))
+
+
+@app.get("/auth/confirmed", response_class=HTMLResponse)
+def auth_confirmed(request: Request, next: str = "/dashboard", error: str = "", error_description: str = ""):
+    next = safe_next(next)
+    if error or error_description:
+        message = error_description or error or "The confirmation link could not be verified. Please try signing up again."
+        return page(request, "login.html", next=next, message=message)
+
+    request.session.pop("signup_email", None)
+    request.session.pop("signup_full_name", None)
+    request.session.pop("signup_next", None)
+    request.session.pop("signup_verification_method", None)
+    request.session.pop("signup_otp_type", None)
+    return page(
+        request,
+        "login.html",
+        next=next,
+        message="Email confirmed successfully. Please log in with your email and password to continue.",
+    )
 
 
 @app.get("/logout")

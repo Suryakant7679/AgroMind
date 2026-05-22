@@ -10,6 +10,18 @@ from supabase import Client, create_client
 load_dotenv(".env.local")
 load_dotenv()
 
+# Clean environment variables of spaces/quotes
+for env_key in [
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY"
+]:
+    env_val = os.getenv(env_key)
+    if env_val:
+        os.environ[env_key] = env_val.strip().strip("'\"")
+
 
 @lru_cache
 def supabase_client() -> Client | None:
@@ -19,6 +31,10 @@ def supabase_client() -> Client | None:
         or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
         or os.getenv("SUPABASE_ANON_KEY")
     )
+    if url:
+        url = url.strip().strip("'\"")
+    if key:
+        key = key.strip().strip("'\"")
     if not url or not key:
         return None
     try:
@@ -31,6 +47,10 @@ def supabase_client() -> Client | None:
 def supabase_auth_client() -> Client | None:
     url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
     key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
+    if url:
+        url = url.strip().strip("'\"")
+    if key:
+        key = key.strip().strip("'\"")
     if not url or not key:
         return None
     try:
@@ -40,8 +60,8 @@ def supabase_auth_client() -> Client | None:
 
 
 def supabase_auth_configured() -> bool:
-    url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
-    key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
+    url = _supabase_url()
+    key = _anon_key()
     return bool(url and key)
 
 
@@ -50,24 +70,51 @@ def supabase_database_configured() -> bool:
 
 
 def _supabase_url() -> str | None:
-    return os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
+    url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
+    return url.strip().strip("'\"") if url else None
 
 
 def _anon_key() -> str | None:
-    return os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
+    key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
+    return key.strip().strip("'\"") if key else None
 
 
 def _database_key() -> str | None:
-    return os.getenv("SUPABASE_SERVICE_ROLE_KEY") or _anon_key()
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or _anon_key()
+    return key.strip().strip("'\"") if key else None
+
+
+def _can_use_python_client(access_token: str | None = None) -> bool:
+    if os.getenv("SUPABASE_SERVICE_ROLE_KEY"):
+        return True
+    if not access_token:
+        return True
+    return False
 
 
 def _rest_headers(key: str, bearer: str | None = None) -> dict[str, str]:
-    return {
+    if key:
+        key = key.strip().strip("'\"")
+    if bearer:
+        bearer = bearer.strip().strip("'\"")
+
+    headers = {
         "apikey": key,
-        "Authorization": f"Bearer {bearer or key}",
         "Content-Type": "application/json",
         "Prefer": "return=representation",
     }
+
+    # If a service role key is available on the backend, always use it for the
+    # Authorization header to bypass RLS and avoid user JWT expiration issues.
+    service_role = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if service_role:
+        service_role = service_role.strip().strip("'\"")
+        headers["Authorization"] = f"Bearer {service_role}"
+    else:
+        token = bearer or key
+        if token and token.startswith("eyJ"):
+            headers["Authorization"] = f"Bearer {token}"
+    return headers
 
 
 def _rest_url(table: str, query: str = "") -> str:
@@ -91,9 +138,12 @@ def sign_in_with_password(email: str, password: str) -> dict:
         raise RuntimeError("Supabase auth is not configured.")
 
     endpoint = f"{url.rstrip('/')}/auth/v1/token?grant_type=password"
+    headers = {"apikey": key}
+    if key.startswith("eyJ"):
+        headers["Authorization"] = f"Bearer {key}"
     response = httpx.post(
         endpoint,
-        headers={"apikey": key, "Authorization": f"Bearer {key}"},
+        headers=headers,
         json={"email": email, "password": password},
         timeout=20,
     )
@@ -107,15 +157,18 @@ def sign_in_with_password(email: str, password: str) -> dict:
     return {"id": user["id"], "email": user["email"], "access_token": payload.get("access_token")}
 
 
-def sign_up_with_password(email: str, password: str, full_name: str = "") -> dict:
+def sign_up_with_password(email: str, password: str, full_name: str = "", redirect_to: str | None = None) -> dict:
     client = supabase_auth_client()
     if client:
         try:
+            options = {"data": {"full_name": full_name or "AgroMind User"}}
+            if redirect_to:
+                options["email_redirect_to"] = redirect_to
             result = client.auth.sign_up(
                 {
                     "email": email,
                     "password": password,
-                    "options": {"data": {"full_name": full_name or "AgroMind User"}},
+                    "options": options,
                 }
             )
             user_id = result.user.id if (result and result.user) else None
@@ -131,9 +184,14 @@ def sign_up_with_password(email: str, password: str, full_name: str = "") -> dic
         raise RuntimeError("Supabase auth is not configured.")
 
     endpoint = f"{url.rstrip('/')}/auth/v1/signup"
+    if redirect_to:
+        endpoint = f"{endpoint}?redirect_to={quote(redirect_to, safe='')}"
+    headers = {"apikey": key}
+    if key.startswith("eyJ"):
+        headers["Authorization"] = f"Bearer {key}"
     response = httpx.post(
         endpoint,
-        headers={"apikey": key, "Authorization": f"Bearer {key}"},
+        headers=headers,
         json={
             "email": email,
             "password": password,
@@ -158,10 +216,51 @@ def sign_up_with_password(email: str, password: str, full_name: str = "") -> dic
     return {"id": user_id, "email": user_email, "access_token": payload.get("access_token") if isinstance(payload, dict) else None}
 
 
-def verify_signup_otp(email: str, token: str) -> dict:
+def send_signup_otp(email: str, full_name: str = "", redirect_to: str | None = None) -> None:
     client = supabase_auth_client()
     if client:
-        result = client.auth.verify_otp({"email": email, "token": token, "type": "signup"})
+        try:
+            options = {"should_create_user": True, "data": {"full_name": full_name or "AgroMind User"}}
+            if redirect_to:
+                options["email_redirect_to"] = redirect_to
+            client.auth.sign_in_with_otp({"email": email, "options": options})
+            return
+        except Exception as e:
+            raise RuntimeError(str(e))
+
+    url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
+    key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
+    if not url or not key:
+        raise RuntimeError("Supabase auth is not configured.")
+
+    endpoint = f"{url.rstrip('/')}/auth/v1/otp"
+    if redirect_to:
+        endpoint = f"{endpoint}?redirect_to={quote(redirect_to, safe='')}"
+    headers = {"apikey": key}
+    if key.startswith("eyJ"):
+        headers["Authorization"] = f"Bearer {key}"
+    response = httpx.post(
+        endpoint,
+        headers=headers,
+        json={
+            "email": email,
+            "create_user": True,
+            "data": {"full_name": full_name or "AgroMind User"},
+        },
+        timeout=20,
+    )
+    if response.status_code >= 400:
+        try:
+            err_msg = response.json().get("error_description") or response.json().get("msg") or "Could not send OTP email."
+        except Exception:
+            err_msg = "Could not send OTP email."
+        raise RuntimeError(err_msg)
+
+
+def verify_signup_otp(email: str, token: str, otp_type: str = "signup") -> dict:
+    client = supabase_auth_client()
+    if client:
+        result = client.auth.verify_otp({"email": email, "token": token, "type": otp_type})
         if not result.user:
             raise RuntimeError("Verification did not return a user.")
         access_token = result.session.access_token if result.session else None
@@ -173,11 +272,14 @@ def verify_signup_otp(email: str, token: str) -> dict:
         raise RuntimeError("Supabase auth is not configured.")
 
     endpoint = f"{url.rstrip('/')}/auth/v1/verify"
+    headers = {"apikey": key}
+    if key.startswith("eyJ"):
+        headers["Authorization"] = f"Bearer {key}"
     response = httpx.post(
         endpoint,
-        headers={"apikey": key, "Authorization": f"Bearer {key}"},
+        headers=headers,
         json={
-            "type": "signup",
+            "type": otp_type,
             "email": email,
             "token": token,
         },
@@ -251,7 +353,7 @@ def save_output(
         "cost_cents": cost_cents,
     }
     client = supabase_client()
-    if client:
+    if client and _can_use_python_client(access_token):
         try:
             client.table("ai_outputs").insert(output_row).execute()
             client.table("usage_events").insert(usage_row).execute()
@@ -280,7 +382,7 @@ def save_output(
 
 def fetch_recent_outputs(user_id: str | None = None, limit: int = 5, access_token: str | None = None) -> list[dict]:
     client = supabase_client()
-    if client:
+    if client and _can_use_python_client(access_token):
         query = client.table("ai_outputs").select("*").order("created_at", desc=True).limit(limit)
         if user_id:
             query = query.eq("user_id", user_id)
@@ -306,7 +408,7 @@ def fetch_usage_events(user_id: str | None, access_token: str | None = None, lim
     if not user_id:
         return []
     client = supabase_client()
-    if client:
+    if client and _can_use_python_client(access_token):
         try:
             return (
                 client.table("usage_events")
@@ -400,7 +502,7 @@ def fetch_profile(user_id: str | None, access_token: str | None = None) -> dict 
     client = supabase_client()
     if not user_id:
         return None
-    if client:
+    if client and _can_use_python_client(access_token):
         try:
             data = client.table("profiles").select("*").eq("id", user_id).single().execute().data
             return data
@@ -447,7 +549,7 @@ def update_profile_plan(user_id: str | None, plan: str, access_token: str | None
         return
     row = {"plan": plan, "updated_at": datetime.now(UTC).isoformat()}
     client = supabase_client()
-    if client:
+    if client and _can_use_python_client(access_token):
         try:
             client.table("profiles").update(row).eq("id", user_id).execute()
             return
@@ -467,22 +569,25 @@ def update_profile(user_id: str | None, profile_data: dict, access_token: str | 
         return
     row = {**profile_data, "updated_at": datetime.now(UTC).isoformat()}
     client = supabase_client()
-    if client:
+    if client and _can_use_python_client(access_token):
         try:
             client.table("profiles").update(row).eq("id", user_id).execute()
             return
-        except Exception as e:
-            raise e
+        except Exception:
+            pass
     key = _database_key()
     if not key:
         raise RuntimeError("Supabase credentials are not configured.")
-    response = httpx.patch(
-        _rest_url("profiles", f"id=eq.{quote(user_id)}"),
-        headers=_rest_headers(key, access_token),
-        json=row,
-        timeout=20,
-    )
-    response.raise_for_status()
+    try:
+        response = httpx.patch(
+            _rest_url("profiles", f"id=eq.{quote(user_id)}"),
+            headers=_rest_headers(key, access_token),
+            json=row,
+            timeout=20,
+        )
+        response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise RuntimeError(f"REST PATCH failed ({e.response.status_code}): {e.response.text}")
 
 
 def save_payment(
@@ -530,7 +635,7 @@ def save_subscription(user_id: str | None, plan: str, access_token: str | None =
         "current_period_end": (datetime.now(UTC) + timedelta(days=30)).isoformat(),
     }
     client = supabase_client()
-    if client:
+    if client and _can_use_python_client(access_token):
         try:
             client.table("subscriptions").insert(row).execute()
             return

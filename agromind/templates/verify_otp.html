@@ -2,48 +2,54 @@
 {% block content %}
   <div class="card" style="max-width:32rem;margin:4rem auto;padding:2.5rem;box-shadow:0 10px 30px rgba(0,0,0,0.25);border-radius:12px;background:rgba(30, 30, 30, 0.6);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.05)">
     <div style="display:inline-flex;align-items:center;gap:0.5rem;background:rgba(16, 185, 129, 0.1);color:#10b981;padding:0.35rem 0.85rem;border-radius:20px;font-size:0.8rem;font-weight:600;margin-bottom:1rem;border:1px solid rgba(16, 185, 129, 0.15)">
-      <span>📬 Email Sent Successfully</span>
+      <span>Email sent successfully</span>
     </div>
-    
+
     <h1 style="margin-bottom:0.75rem;font-size:1.85rem;font-weight:700;background:linear-gradient(135deg, #10b981 0%, #3b82f6 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Check Your Inbox!</h1>
-    
+
     <p class="muted" style="margin-bottom:1.5rem;font-size:0.95rem;line-height:1.5">
-      We have sent a verification email to <strong>{{ email or 'your address' }}</strong>. 
+      We have sent {% if mode == "otp" %}a 6-digit OTP code{% else %}a confirmation link{% endif %} to <strong>{{ email or 'your address' }}</strong>.
     </p>
 
     <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:1rem;margin-bottom:1.5rem;font-size:0.9rem;line-height:1.4">
-      <span style="color:#10b981;font-weight:600">Choose how to activate:</span>
-      <ul style="margin:0.5rem 0 0 1.2rem;padding:0;color:rgba(255,255,255,0.8)">
-        <li style="margin-bottom:0.35rem">Click the <strong>confirmation link</strong> in your email to automatically log in.</li>
-        <li>Or, enter the <strong>6-digit OTP code</strong> from the email below.</li>
-      </ul>
+      {% if mode == "otp" %}
+        <span style="color:#10b981;font-weight:600">Enter the code below to activate your account.</span>
+        <p class="muted" style="margin:0.5rem 0 0">After verification, you will be signed in automatically.</p>
+      {% else %}
+        <span style="color:#10b981;font-weight:600">Open your email and click the confirmation link.</span>
+        <p class="muted" style="margin:0.5rem 0 0">After confirming your email, return here and log in with your password.</p>
+      {% endif %}
     </div>
-    
+
     {% if message %}
       <div style="background:rgba(239, 68, 68, 0.1);border:1px solid rgba(239, 68, 68, 0.2);color:#ef4444;padding:0.75rem 1rem;border-radius:6px;margin-bottom:1.5rem;font-size:0.9rem">
         {{ message }}
       </div>
     {% endif %}
-    
-    <form method="post">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <input type="hidden" name="next" value="{{ next }}">
-      
-      <div class="form-row" style="margin-bottom:1.25rem">
-        <label style="display:block;margin-bottom:0.5rem;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.6)">Email Address</label>
-        <input name="email" type="email" required value="{{ email or '' }}" placeholder="user@example.com" style="width:100%;padding:0.75rem 1rem;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.2);color:#fff">
-      </div>
-      
-      <div class="form-row" style="margin-bottom:1.75rem">
-        <label style="display:block;margin-bottom:0.5rem;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.6)">6-Digit Verification Code</label>
-        <input name="token" type="text" required pattern="[0-9]{6}" maxlength="6" placeholder="000000" autofocus autocomplete="one-time-code" style="width:100%;padding:0.9rem;border-radius:6px;border:1px solid rgba(16, 185, 129, 0.3);background:rgba(16, 185, 129, 0.05);color:#fff;font-size:1.75rem;font-weight:700;text-align:center;letter-spacing:0.4em;box-shadow:0 0 10px rgba(16, 185, 129, 0.1)">
-      </div>
-      
-      <button class="button" type="submit" style="width:100%;padding:0.85rem;font-size:1rem;font-weight:600;background:linear-gradient(135deg, #10b981 0%, #059669 100%);border:none;box-shadow:0 4px 12px rgba(16, 185, 129, 0.3);transition:transform 0.2s, box-shadow 0.2s;cursor:pointer">Verify OTP & Continue</button>
-    </form>
-    
+
+    {% if mode == "otp" %}
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="next" value="{{ next }}">
+
+        <div class="form-row" style="margin-bottom:1.25rem">
+          <label style="display:block;margin-bottom:0.5rem;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.6)">Email Address</label>
+          <input name="email" type="email" required value="{{ email or '' }}" placeholder="user@example.com" style="width:100%;padding:0.75rem 1rem;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.2);color:#fff">
+        </div>
+
+        <div class="form-row" style="margin-bottom:1.75rem">
+          <label style="display:block;margin-bottom:0.5rem;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.6)">6-Digit Verification Code</label>
+          <input name="token" type="text" required pattern="[0-9]{6}" maxlength="6" placeholder="000000" autofocus autocomplete="one-time-code" style="width:100%;padding:0.9rem;border-radius:6px;border:1px solid rgba(16, 185, 129, 0.3);background:rgba(16, 185, 129, 0.05);color:#fff;font-size:1.75rem;font-weight:700;text-align:center;letter-spacing:0.4em;box-shadow:0 0 10px rgba(16, 185, 129, 0.1)">
+        </div>
+
+        <button class="button" type="submit" style="width:100%;padding:0.85rem;font-size:1rem;font-weight:600;background:linear-gradient(135deg, #10b981 0%, #059669 100%);border:none;box-shadow:0 4px 12px rgba(16, 185, 129, 0.3);transition:transform 0.2s, box-shadow 0.2s;cursor:pointer">Verify OTP & Continue</button>
+      </form>
+    {% else %}
+      <a class="button" href="/login?next={{ next }}" style="display:block;text-align:center;width:100%;box-sizing:border-box;padding:0.85rem;font-size:1rem;font-weight:600;background:linear-gradient(135deg, #10b981 0%, #059669 100%);border:none;box-shadow:0 4px 12px rgba(16, 185, 129, 0.3)">Go to Login</a>
+    {% endif %}
+
     <div style="margin-top:2rem;text-align:center;border-top:1px solid rgba(255,255,255,0.05);padding-top:1.5rem">
-      <p class="muted" style="font-size:0.85rem;margin:0">Didn't receive the email? Check your spam folder or <a href="/signup" style="color:#10b981;text-decoration:none;font-weight:500">try signing up again</a>.</p>
+      <p class="muted" style="font-size:0.85rem;margin:0">Did not receive the email? Check your spam folder or <a href="/signup" style="color:#10b981;text-decoration:none;font-weight:500">try signing up again</a>.</p>
     </div>
   </div>
 {% endblock %}
