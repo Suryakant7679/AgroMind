@@ -1,5 +1,6 @@
 import io
 import base64
+import time
 import hashlib
 import hmac
 import os
@@ -69,6 +70,7 @@ for env_key in [
     if env_val:
         os.environ[env_key] = env_val.strip().strip("'\"")
 
+SERVER_START_TIME = time.time()
 DEFAULT_DEV_SECRET = "agromind-dev-secret"
 BASE_DIR = Path(__file__).resolve().parent
 session_secret = os.getenv("SESSION_SECRET", DEFAULT_DEV_SECRET)
@@ -586,6 +588,80 @@ def logout(request: Request):
 @app.get("/api/usage")
 def usage():
     return {"message": "Use authenticated /analytics for real user usage data."}
+
+
+@app.get("/system-monitor", response_class=HTMLResponse)
+def system_monitor(request: Request):
+    user_or_response = require_user(request)
+    if isinstance(user_or_response, RedirectResponse):
+        return user_or_response
+    
+    # Calculate uptime
+    uptime_seconds = time.time() - SERVER_START_TIME
+    days = int(uptime_seconds // (24 * 3600))
+    hours = int((uptime_seconds % (24 * 3600)) // 3600)
+    minutes = int((uptime_seconds % 3600) // 60)
+    seconds = int(uptime_seconds % 60)
+    
+    uptime_parts = []
+    if days > 0: uptime_parts.append(f"{days}d")
+    if hours > 0: uptime_parts.append(f"{hours}h")
+    if minutes > 0: uptime_parts.append(f"{minutes}m")
+    uptime_parts.append(f"{seconds}s")
+    uptime_str = " ".join(uptime_parts)
+
+    # Validate environment variables
+    env_status = {
+        "GROQ_API_KEY": {
+            "name": "GROQ_API_KEY",
+            "type": "Required",
+            "status": "configured" if os.getenv("GROQ_API_KEY") else "missing",
+            "description": "Required for voice STT transcription and dynamic agriculture calculator reasoning."
+        },
+        "GEMINI_API_KEY": {
+            "name": "GEMINI_API_KEY",
+            "type": "Required",
+            "status": "configured" if os.getenv("GEMINI_API_KEY") else "missing",
+            "description": "Required for crop disease analysis image processing and fallback LLM support."
+        },
+        "DATA_GOV_IN_API_KEY": {
+            "name": "DATA_GOV_IN_API_KEY",
+            "type": "Optional",
+            "status": "configured" if os.getenv("DATA_GOV_IN_API_KEY") else "missing (fallback active)",
+            "description": "Optional government key. Falls back to static agronomical historical pricing database if missing."
+        },
+        "PLANT_ID_API_KEY": {
+            "name": "PLANT_ID_API_KEY",
+            "type": "Optional",
+            "status": "configured" if os.getenv("PLANT_ID_API_KEY") else "missing (Gemini vision active)",
+            "description": "Optional leaf analysis key. Falls back to highly-accurate Gemini vision diagnostic scanner if missing."
+        },
+        "SUPABASE_URL": {
+            "name": "SUPABASE_URL",
+            "type": "Required",
+            "status": "configured" if os.getenv("SUPABASE_URL") else "missing",
+            "description": "Required for farmer database sync, pricing plans, and dashboard profile audits."
+        }
+    }
+
+    return page(request, "system_monitor.html", uptime=uptime_str, env_status=env_status)
+
+
+@app.post("/api/health-check")
+async def api_health_check(request: Request):
+    user_or_response = require_user(request)
+    if isinstance(user_or_response, RedirectResponse):
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    
+    form = await request.form()
+    verify_csrf(request, str(form.get("csrf_token", "")))
+    
+    from agromind.health import run_all_health_checks
+    try:
+        results = await run_all_health_checks()
+        return {"ok": True, "results": results}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Diagnostic check suite crashed: {str(exc)}")
 
 
 @app.post("/api/billing/create-order")

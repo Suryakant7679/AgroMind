@@ -11,6 +11,28 @@ def build_system_prompt(domain_id: str, tool_id: str, language_name: str = "Engl
             "Flag emergency symptoms clearly and recommend urgent professional care when relevant."
         )
 
+    agri_instructions = ""
+    if tool_id == "agriculture-tools":
+        agri_instructions = (
+            "You are operating as the central agronomic engine of the AgroMind Precision Agriculture Dashboard.\n"
+            "Analyze any provided 'live_environmental_telemetry' (soil grids data, Open-Meteo 7-day forecast, and NASA solar index) to customize the dosages and water volumes.\n"
+            "CRITICAL: In addition to a beautifully structured, highly practical agricultural markdown report, you MUST append a valid, parseable JSON block at the very bottom of your response enclosed in ```json and ``` tags. This JSON block drives the real-time SaaS widgets on the farmer's dashboard. Fill all fields with realistic, intelligent agronomic estimations based on the inputs and telemetry:\n"
+            "```json\n"
+            "{\n"
+            "  \"npk\": {\"n\": 45, \"p\": 30, \"k\": 20},\n"
+            "  \"water_req_liters_per_acre\": 15000,\n"
+            "  \"drought_flood_risk\": \"low\",\n"
+            "  \"estimated_harvest_days\": 120,\n"
+            "  \"mandi_live_price\": \"INR 3,250 / quintal\",\n"
+            "  \"mandi_predicted_price\": \"INR 3,500 / quintal\",\n"
+            "  \"weather_alerts\": [\"frost alert\", \"storm warning\"],\n"
+            "  \"disease_risk\": \"low\",\n"
+            "  \"ndvi_health_index\": 0.85\n"
+            "}\n"
+            "```\n"
+            "Do not omit any keys in the JSON block, and keep it valid JSON."
+        )
+
     parts = [
         "You are AgroMind AI, a careful multi-domain assistant.",
         f"Respond only in {language_name}. Keep technical terms clear and explain them simply when needed.",
@@ -19,6 +41,7 @@ def build_system_prompt(domain_id: str, tool_id: str, language_name: str = "Engl
         "For uploaded images or PDFs, explain that analysis depends on file readability and the configured multimodal provider.",
         f"Domain: {domain['name']}. {domain['description']}" if domain else "",
         f"Tool: {tool['title']}. Required output areas: {', '.join(tool['output_hints'])}." if tool else "",
+        agri_instructions,
         safety,
     ]
     return "\n".join(part for part in parts if part)

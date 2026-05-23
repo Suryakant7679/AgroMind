@@ -1106,3 +1106,157 @@ textarea + .speech-mic-btn.recording {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.8; }
 }
+
+/* --- PRECISION AGRICULTURE OPERATING SYSTEM DASHBOARD STYLES --- */
+:root {
+  --ag-green: #10b981;
+  --ag-blue: #3b82f6;
+  --ag-orange: #f97316;
+  --ag-yellow: #f59e0b;
+}
+
+.kpi-card {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(to right, transparent, rgba(255,255,255,0.15), transparent);
+  transform: skewX(-25deg);
+  pointer-events: none;
+}
+
+.kpi-card:hover::after {
+  animation: shimmerEffect 1.2s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px rgba(15, 118, 110, 0.05) !important;
+  border-color: rgba(15, 118, 110, 0.25) !important;
+}
+
+.tab-btn {
+  transition: all 0.2s ease-in-out;
+}
+
+.tab-btn.active {
+  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.25);
+}
+
+.button-locate {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.button-locate:hover {
+  background-color: #0d9488 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2);
+}
+
+.button-locate:active {
+  transform: translateY(0);
+}
+
+@keyframes pulseRipple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+    transform: scale(0.96);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+    transform: scale(1);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    transform: scale(0.96);
+  }
+}
+
+@keyframes fadeInScale {
+  0% {
+    opacity: 0;
+    transform: scale(0.97) translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes shimmerEffect {
+  100% {
+    left: 200%;
+  }
+}
+
+.tab-content {
+  animation: fadeInScale 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* HIGH-FIDELITY PRINTDirectives for PDF Exports */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .sidebar,
+  .topbar,
+  .sidebar-overlay,
+  .voice-assistant-container,
+  form,
+  .tts-speak-btn,
+  #dashboard-tabs {
+    display: none !important;
+  }
+  .layout {
+    display: block !important;
+  }
+  .main {
+    padding: 0 !important;
+  }
+  .grid-2 {
+    grid-template-columns: 1fr !important;
+    display: block !important;
+  }
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin-bottom: 2rem !important;
+  }
+  #tab-report,
+  #tab-dashboard {
+    display: block !important;
+    width: 100% !important;
+  }
+  .output {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    font-size: 11pt !important;
+  }
+  .kpi-card {
+    border: 1px solid #cbd5e1 !important;
+    background: #fdfdfd !important;
+    page-break-inside: avoid !important;
+  }
+  table {
+    page-break-inside: auto !important;
+  }
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+  h1, h2, h3 {
+    page-break-after: avoid !important;
+  }
+}

@@ -1,5 +1,95 @@
 {% extends "base.html" %}
 {% block content %}
+  <!-- Premium SaaS-style CSS definitions locally scoped to Tool Dashboard -->
+  <style>
+    .form-row {
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity 0.3s ease, transform 0.3s ease, padding 0.3s ease, margin 0.3s ease;
+    }
+    .form-row.hidden-field {
+      opacity: 0 !important;
+      transform: translateY(-8px) !important;
+      pointer-events: none !important;
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      border: none !important;
+      height: 0 !important;
+      overflow: hidden !important;
+    }
+    .button-locate {
+      transition: background-color 0.2s, transform 0.2s;
+    }
+    .button-locate:hover {
+      background-color: #0d9488 !important;
+      transform: translateY(-1px);
+    }
+    .button-locate:active {
+      transform: translateY(0);
+    }
+    @keyframes pulseRipple {
+      0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+      }
+      70% {
+        box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+      }
+    }
+    .kpi-card {
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .kpi-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.04) !important;
+    }
+    .tab-btn {
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .tab-btn:hover {
+      filter: brightness(0.95);
+    }
+    /* PRINT Styles for Clean Enterprise Farming Reports */
+    @media print {
+      body {
+        background: white !important;
+        color: black !important;
+      }
+      .sidebar, .topbar, .sidebar-overlay, .voice-assistant-container, form, .tts-speak-btn, #dashboard-tabs {
+        display: none !important;
+      }
+      .layout {
+        display: block !important;
+      }
+      .grid-2 {
+        grid-template-columns: 1fr !important;
+      }
+      .card {
+        border: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        padding: 0 !important;
+      }
+      #tab-report, #tab-dashboard {
+        display: block !important;
+      }
+      .output {
+        border: none !important;
+        background: transparent !important;
+        padding: 0 !important;
+        font-size: 11pt !important;
+      }
+      .kpi-card {
+        border: 1px solid #ccc !important;
+        background: #fdfdfd !important;
+      }
+    }
+  </style>
+
   <div class="grid grid-2">
     <section class="card">
       <span class="badge">{{ domain.name }}</span>
@@ -8,7 +98,8 @@
       {% if tool.disclaimer %}
         <div class="alert">{{ tool.disclaimer }}</div>
       {% endif %}
-      <form method="post" enctype="multipart/form-data" style="margin-top:1rem">
+      
+      <form id="agromind-tool-form" method="post" enctype="multipart/form-data" style="margin-top:1rem" onsubmit="return validateAgricultureForm(event)">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="model-panel">
           <div class="form-row">
@@ -21,11 +112,22 @@
           </div>
           <p class="field-note" data-i18n="tool.aiChoiceNote">AgroMind automatically chooses the right AI for reasoning, multilingual answers, and image analysis.</p>
         </div>
+        
         {% for field in tool.fields %}
-          <div class="form-row">
+          <div class="form-row" id="row-{{ field.name }}">
             <label for="{{ field.name }}">{{ field.label }}</label>
-            {% if field.type == "textarea" %}
+            
+            {% if field.name == "location" %}
+              <div style="display: flex; gap: 8px; align-items: stretch;">
+                <input id="{{ field.name }}" name="{{ field.name }}" type="text" placeholder="{{ field.placeholder or '' }}" value="{{ fields.get(field.name, "") }}" style="flex: 1;">
+                <button type="button" class="button button-locate" onclick="autofillLocation(this)" style="padding: 0 1rem; flex-shrink: 0; background: var(--primary); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                  <span>📍</span> <span data-i18n="tool.locate">Locate</span>
+                </button>
+              </div>
+            
+            {% elif field.type == "textarea" %}
               <textarea id="{{ field.name }}" name="{{ field.name }}" placeholder="{{ field.placeholder or '' }}">{{ fields.get(field.name, "") }}</textarea>
+            
             {% elif field.type == "select" %}
               <select id="{{ field.name }}" name="{{ field.name }}">
                 <option value="">Select {{ field.label }}</option>
@@ -33,11 +135,13 @@
                   <option value="{{ option }}" {% if fields.get(field.name) == option %}selected{% endif %}>{{ option }}</option>
                 {% endfor %}
               </select>
+            
             {% else %}
               <input id="{{ field.name }}" name="{{ field.name }}" type="{{ field.type }}" placeholder="{{ field.placeholder or '' }}" value="{{ fields.get(field.name, "") }}">
             {% endif %}
           </div>
         {% endfor %}
+        
         {% if tool.accepts %}
           <div class="form-row">
             <label for="asset" data-i18n="tool.uploadFile">Upload file</label>
@@ -54,10 +158,12 @@
             <p class="field-note" data-i18n="tool.uploadNote">Upload or capture plant leaves, skin photos, report images, or readable PDFs/images when the tool needs visual context.</p>
           </div>
         {% endif %}
+        
         <button class="button" type="submit" data-i18n="tool.generate">Generate</button>
         <button class="button secondary" type="button" onclick="window.print()" data-i18n="tool.exportPdf">Export PDF</button>
       </form>
     </section>
+    
     <section class="card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
         <h2 style="margin: 0;" data-i18n="tool.aiOutput">AI Output</h2>
@@ -67,13 +173,411 @@
           </button>
         {% endif %}
       </div>
+
+      <!-- High-End Dashboard Tabs for Agricultural Reports -->
+      <div class="tabs-header" id="dashboard-tabs" style="display: none; gap: 8px; margin-bottom: 1.2rem; border-bottom: 1px solid var(--line); padding-bottom: 8px;">
+        <button type="button" class="tab-btn active" id="tab-btn-report" onclick="switchDashboardTab('report')" style="font-weight: 700; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; background: var(--primary); color: white; font-size: 0.82rem;">📄 AI Report</button>
+        <button type="button" class="tab-btn" id="tab-btn-dashboard" onclick="switchDashboardTab('dashboard')" style="font-weight: 700; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; background: rgba(0,0,0,0.05); color: var(--text); font-size: 0.82rem;">📊 SaaS Dashboard</button>
+      </div>
+      
       {% if error %}
         <p class="error">{{ error }}</p>
       {% elif output_html %}
-        <div id="ai-output-text" class="output" data-response-language="{{ response_language or default_language }}">{{ output_html|safe }}</div>
+        <div id="tab-report" class="tab-content">
+          <div id="ai-output-text" class="output" data-response-language="{{ response_language or default_language }}">{{ output_html|safe }}</div>
+        </div>
+        <div id="tab-dashboard" class="tab-content" style="display: none;">
+          <!-- Live Precision Dashboard widgets will populate here -->
+        </div>
       {% else %}
         <p class="muted" data-i18n="tool.placeholder">Results, tables, and markdown reports will appear here.</p>
       {% endif %}
     </section>
   </div>
+
+  <script>
+    const isAgriTool = "{{ tool.id }}" === "agriculture-tools";
+
+    // Dynamic Form Schema Manager
+    function updateAgriFormFields() {
+      if (!isAgriTool) return;
+      
+      const toolNeedSelect = document.getElementById("toolNeed");
+      if (!toolNeedSelect) return;
+      
+      const toolNeed = toolNeedSelect.value;
+      
+      // Dynamic fields mapping
+      const subToolFields = {
+        "Fertilizer calculator": ["toolNeed", "crop", "farmSize", "soilType", "irrigation", "season", "npk_n", "npk_p", "npk_k"],
+        "Irrigation planner": ["toolNeed", "crop", "farmSize", "soilType", "location", "irrigationMethod"],
+        "Weather alerts": ["toolNeed", "location", "crop"],
+        "Harvest planning": ["toolNeed", "crop", "sowingDate", "location"],
+        "Seed recommendation": ["toolNeed", "crop", "farmSize", "soilType", "season", "location"],
+        "Market price insights": ["toolNeed", "crop", "state", "marketDistrict"]
+      };
+      
+      const allFields = [
+        "toolNeed", "crop", "farmSize", "soilType", "irrigation", "season", 
+        "npk_n", "npk_p", "npk_k", "location", "irrigationMethod", 
+        "sowingDate", "state", "marketDistrict"
+      ];
+      
+      const visibleFields = subToolFields[toolNeed] || ["toolNeed"]; // Default to toolNeed if none selected
+      
+      allFields.forEach(field => {
+        const row = document.getElementById("row-" + field);
+        if (!row) return;
+        
+        if (visibleFields.includes(field)) {
+          row.style.display = "block";
+          setTimeout(() => {
+            row.classList.remove("hidden-field");
+          }, 10);
+        } else {
+          row.classList.add("hidden-field");
+          setTimeout(() => {
+            if (row.classList.contains("hidden-field")) {
+              row.style.display = "none";
+            }
+          }, 300);
+        }
+      });
+    }
+
+    // Geolocation Reverse Geocoding
+    function autofillLocation(btn) {
+      if (!navigator.geolocation) {
+        alert("Geolocation is not supported by your browser.");
+        return;
+      }
+      
+      const originalText = btn.innerHTML;
+      btn.innerHTML = "🌀 Geocoding...";
+      btn.disabled = true;
+      btn.style.opacity = "0.8";
+      
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          
+          const locInput = document.getElementById("location");
+          if (locInput) {
+            locInput.value = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+          }
+          
+          try {
+            const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+            if (resp.ok) {
+              const data = await resp.json();
+              const addr = data.address || {};
+              
+              const city = addr.city || addr.town || addr.village || addr.suburb || "";
+              const district = addr.county || addr.state_district || "";
+              const state = addr.state || "";
+              
+              if (locInput) {
+                locInput.value = `${city || district || "Precision Farm"}, ${state} (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+              }
+              
+              const stateInput = document.getElementById("state");
+              if (stateInput) {
+                stateInput.value = state;
+              }
+              
+              const marketInput = document.getElementById("marketDistrict");
+              if (marketInput) {
+                marketInput.value = district ? `${district} District` : `${city} Mandi`;
+              }
+            }
+          } catch (err) {
+            console.error("Nominatim geocoder error", err);
+          } finally {
+            btn.innerHTML = "✅ Located";
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            setTimeout(() => { btn.innerHTML = "<span>📍</span> Locate"; }, 3000);
+          }
+        },
+        (error) => {
+          console.error("GPS error", error);
+          btn.innerHTML = "❌ Failed";
+          btn.disabled = false;
+          btn.style.opacity = "1";
+          setTimeout(() => { btn.innerHTML = "<span>📍</span> Locate"; }, 3000);
+        },
+        { timeout: 10000, enableHighAccuracy: true }
+      );
+    }
+
+    // Intelligent Validator
+    function validateAgricultureForm(e) {
+      if (!isAgriTool) return true;
+      
+      const toolNeed = document.getElementById("toolNeed").value;
+      if (!toolNeed) {
+        alert("Please select an Agriculture Tool first.");
+        e.preventDefault();
+        return false;
+      }
+      
+      // Basic validations
+      if (toolNeed === "Fertilizer calculator" || toolNeed === "Seed recommendation" || toolNeed === "Irrigation planner") {
+        const crop = document.getElementById("crop").value.trim();
+        if (!crop) {
+          alert("Please enter a crop name.");
+          e.preventDefault();
+          return false;
+        }
+        const farmSize = document.getElementById("farmSize").value.trim();
+        if (!farmSize) {
+          alert("Please enter your farm or land size.");
+          e.preventDefault();
+          return false;
+        }
+      }
+      
+      // Optional NPK checks
+      const npkFields = ["npk_n", "npk_p", "npk_k"];
+      for (const field of npkFields) {
+        const input = document.getElementById(field);
+        if (input && input.value) {
+          const val = parseFloat(input.value);
+          if (isNaN(val) || val < 0 || val > 1000) {
+            alert("NPK values must be positive numbers between 0 and 1000 ppm.");
+            e.preventDefault();
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+
+    // Dynamic Dashboard Tabs Swapper
+    function switchDashboardTab(tabId) {
+      const btnReport = document.getElementById("tab-btn-report");
+      const btnDashboard = document.getElementById("tab-btn-dashboard");
+      const tabReport = document.getElementById("tab-report");
+      const tabDashboard = document.getElementById("tab-dashboard");
+
+      if (tabId === "report") {
+        if (btnReport) {
+          btnReport.classList.add("active");
+          btnReport.style.background = "var(--primary)";
+          btnReport.style.color = "white";
+        }
+        if (btnDashboard) {
+          btnDashboard.classList.remove("active");
+          btnDashboard.style.background = "rgba(0,0,0,0.05)";
+          btnDashboard.style.color = "var(--text)";
+        }
+        if (tabReport) tabReport.style.display = "block";
+        if (tabDashboard) tabDashboard.style.display = "none";
+      } else {
+        if (btnDashboard) {
+          btnDashboard.classList.add("active");
+          btnDashboard.style.background = "var(--primary)";
+          btnDashboard.style.color = "white";
+        }
+        if (btnReport) {
+          btnReport.classList.remove("active");
+          btnReport.style.background = "rgba(0,0,0,0.05)";
+          btnReport.style.color = "var(--text)";
+        }
+        if (tabReport) tabReport.style.display = "none";
+        if (tabDashboard) tabDashboard.style.display = "block";
+      }
+    }
+
+    // Dynamic Dashboard Renderer
+    function renderPrecisionDashboard(data) {
+      const container = document.getElementById("tab-dashboard");
+      if (!container) return;
+      
+      const tabsHeader = document.getElementById("dashboard-tabs");
+      if (tabsHeader) tabsHeader.style.display = "flex";
+      
+      const npk = data.npk || {n: 40, p: 25, k: 30};
+      const water = data.water_req_liters_per_acre || 12000;
+      const risk = data.drought_flood_risk || "low";
+      const harvest = data.estimated_harvest_days || 90;
+      const mandiLive = data.mandi_live_price || "INR 3,100 / quintal";
+      const mandiPred = data.mandi_predicted_price || "INR 3,350 / quintal";
+      const alerts = data.weather_alerts || [];
+      const disease = data.disease_risk || "low";
+      const ndvi = data.ndvi_health_index || 0.82;
+
+      let riskColor = risk === "high" ? "#ef4444" : risk === "moderate" ? "#f97316" : "#10b981";
+      let diseaseColor = disease === "high" ? "#ef4444" : disease === "moderate" ? "#f97316" : "#10b981";
+
+      container.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 1.2rem; width: 100%;">
+          
+          <!-- Column 1: KPI Highlights -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+            
+            <div class="kpi-card" style="border: 1px solid var(--line); border-radius: 12px; padding: 1rem; background: var(--panel); box-shadow: 0 4px 10px rgba(0,0,0,0.015); display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span class="muted" style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">NDVI Canopy Index</span>
+                  <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981; animation: pulseRipple 1.8s infinite;"></span>
+                </div>
+                <h2 style="font-size:2rem; margin: 0.4rem 0 0.1rem 0; font-weight:800; color: #10b981;">${ndvi.toFixed(2)}</h2>
+              </div>
+              <div style="background: rgba(16, 185, 129, 0.08); border-radius: 6px; padding: 2px 6px; font-size: 0.68rem; font-weight: 700; color: #10b981; text-align: center;">
+                Optimal Health (Optimal Canopy)
+              </div>
+            </div>
+
+            <div class="kpi-card" style="border: 1px solid var(--line); border-radius: 12px; padding: 1rem; background: var(--panel); box-shadow: 0 4px 10px rgba(0,0,0,0.015); display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <span class="muted" style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">Water Target</span>
+                <h2 style="font-size:1.6rem; margin: 0.4rem 0 0.1rem 0; font-weight:800; color: var(--primary);">${water.toLocaleString()} L<span style="font-size: 0.75rem; font-weight:500;">/acre</span></h2>
+              </div>
+              <div style="display:flex; align-items:center; gap: 6px;">
+                <div style="flex:1; height:5px; background:rgba(0,0,0,0.05); border-radius:2px; overflow:hidden;">
+                  <div style="width: 75%; height:100%; background:var(--primary); border-radius:2px;"></div>
+                </div>
+                <span style="font-size:0.62rem; font-weight:700; color:var(--primary);">Rain-Adjusted</span>
+              </div>
+            </div>
+
+            <div class="kpi-card" style="border: 1px solid var(--line); border-radius: 12px; padding: 1rem; background: var(--panel); box-shadow: 0 4px 10px rgba(0,0,0,0.015); display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <span class="muted" style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">Mandi Price (quintal)</span>
+                <h2 style="font-size:1.3rem; margin: 0.4rem 0 0.1rem 0; font-weight:800; color: #16a34a;">${mandiLive}</h2>
+                <span style="font-size:0.65rem; color:var(--muted); font-weight:600;">Pred: <span style="color:#16a34a; font-weight:700;">${mandiPred}</span> 📈</span>
+              </div>
+              <div style="background: rgba(22, 163, 74, 0.08); border-radius: 6px; padding: 2px 6px; font-size: 0.65rem; font-weight: 700; color: #16a34a; text-align: center;">
+                Favorable Sell Trend
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Column 2: Specific Telemetry meters -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem;">
+            
+            <div style="border: 1px solid var(--line); border-radius: 12px; padding: 1rem; background: var(--panel); box-shadow: 0 4px 10px rgba(0,0,0,0.015);">
+              <h3 style="margin-top:0; font-size:0.85rem; font-weight:700; margin-bottom:0.8rem; display:flex; justify-content:space-between; align-items:center;">
+                <span>Estimated N-P-K Levels</span>
+                <span class="badge" style="background:rgba(15,118,110,0.1); color:var(--primary); font-size:0.6rem;">SoilGrids Target</span>
+              </h3>
+              <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+                <div>
+                  <div style="display:flex; justify-content:space-between; font-size:0.7rem; font-weight:700; margin-bottom:2px;">
+                    <span>Nitrogen (N)</span>
+                    <span>${npk.n} ppm</span>
+                  </div>
+                  <div style="height:6px; background:rgba(0,0,0,0.05); border-radius:3px; overflow:hidden;">
+                    <div style="width: ${Math.min(100, (npk.n / 100) * 100)}%; height:100%; background:#f97316; border-radius:3px;"></div>
+                  </div>
+                </div>
+                <div>
+                  <div style="display:flex; justify-content:space-between; font-size:0.7rem; font-weight:700; margin-bottom:2px;">
+                    <span>Phosphorus (P)</span>
+                    <span>${npk.p} ppm</span>
+                  </div>
+                  <div style="height:6px; background:rgba(0,0,0,0.05); border-radius:3px; overflow:hidden;">
+                    <div style="width: ${Math.min(100, (npk.p / 60) * 100)}%; height:100%; background:#3b82f6; border-radius:3px;"></div>
+                  </div>
+                </div>
+                <div>
+                  <div style="display:flex; justify-content:space-between; font-size:0.7rem; font-weight:700; margin-bottom:2px;">
+                    <span>Potassium (K)</span>
+                    <span>${npk.k} ppm</span>
+                  </div>
+                  <div style="height:6px; background:rgba(0,0,0,0.05); border-radius:3px; overflow:hidden;">
+                    <div style="width: ${Math.min(100, (npk.k / 150) * 100)}%; height:100%; background:#10b981; border-radius:3px;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="border: 1px solid var(--line); border-radius: 12px; padding: 1rem; background: var(--panel); box-shadow: 0 4px 10px rgba(0,0,0,0.015); display:flex; flex-direction:column; justify-content:space-between;">
+              <h3 style="margin-top:0; font-size:0.85rem; font-weight:700; margin-bottom:0.6rem;">Agronomic Calendar</h3>
+              
+              <div style="display:flex; align-items:center; gap: 12px; margin-bottom:0.6rem;">
+                <div style="width: 60px; height: 60px; border-radius:50%; border: 5px solid #e2e8f0; display:flex; align-items:center; justify-content:center; flex-shrink:0; position:relative;">
+                  <div style="position:absolute; width:100%; height:100%; border-radius:50%; border: 5px solid var(--primary); border-top-color:transparent; border-right-color:transparent; transform: rotate(45deg);"></div>
+                  <div style="text-align:center;">
+                    <span style="font-size:0.85rem; font-weight:800; display:block; color:var(--text);">${harvest}</span>
+                    <span style="font-size:0.45rem; text-transform:uppercase; color:var(--muted); font-weight:700;">Days</span>
+                  </div>
+                </div>
+                <div>
+                  <span style="font-size:0.75rem; font-weight:700; color:var(--text); display:block;">Harvest Target window</span>
+                  <span style="font-size:0.62rem; color:var(--muted); font-weight:600;">Based on accumulated growing degree-days (GDD).</span>
+                </div>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:0.4rem; border-top: 1px solid var(--line); padding-top:0.6rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.7rem;">
+                  <span class="muted" style="font-weight:700;">Drought / Excess Water Risk:</span>
+                  <span class="badge" style="background:${riskColor}15; color:${riskColor}; font-weight:800; font-size:0.6rem; text-transform:uppercase; padding: 2px 6px;">${risk}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.7rem;">
+                  <span class="muted" style="font-weight:700;">Pathogen / Fungal Strain:</span>
+                  <span class="badge" style="background:${diseaseColor}15; color:${diseaseColor}; font-weight:800; font-size:0.6rem; text-transform:uppercase; padding: 2px 6px;">${disease}</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Active Weather Risk Engine -->
+          <div style="border: 1px solid var(--line); border-radius: 12px; padding: 1rem; background: var(--panel); box-shadow: 0 4px 10px rgba(0,0,0,0.015);">
+            <h3 style="margin-top:0; font-size:0.85rem; font-weight:700; margin-bottom:0.6rem;">⚠️ Climate Alerts & Stress Warnings</h3>
+            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+              ${alerts.map(alert => `
+                <div style="display:flex; align-items:center; gap:8px; background:rgba(239, 68, 68, 0.04); border-left:3px solid #ef4444; border-radius:4px; padding:6px 10px; font-size:0.75rem; font-weight:600; color:#ef4444;">
+                  <span>🚨</span>
+                  <span>${alert}</span>
+                </div>
+              `).join("") || `
+                <div style="display:flex; align-items:center; gap:8px; background:rgba(16, 185, 129, 0.04); border-left:3px solid #10b981; border-radius:4px; padding:6px 10px; font-size:0.75rem; font-weight:600; color:#10b981;">
+                  <span>🌾</span>
+                  <span>Open-Meteo forecasts stable weather. Soil stress parameters are nominal.</span>
+                </div>
+              `}
+            </div>
+          </div>
+
+        </div>
+      `;
+    }
+
+    // Initialization & Form binding on load
+    document.addEventListener("DOMContentLoaded", () => {
+      if (isAgriTool) {
+        // Bind dynamic form fields
+        const toolNeedSelect = document.getElementById("toolNeed");
+        if (toolNeedSelect) {
+          toolNeedSelect.addEventListener("change", updateAgriFormFields);
+          updateAgriFormFields();
+        }
+      }
+
+      // Parse JSON from output text if it exists
+      const outputTextEl = document.getElementById("ai-output-text");
+      if (outputTextEl) {
+        const text = outputTextEl.innerText || outputTextEl.textContent;
+        const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+          try {
+            const data = JSON.parse(jsonMatch[1]);
+            renderPrecisionDashboard(data);
+            
+            // Clean up the JSON block so the grower only sees the beautiful Markdown report!
+            const html = outputTextEl.innerHTML;
+            const cleanHtml = html.replace(/<pre><code class="language-json">[\s\S]*?<\/code><\/pre>/, "");
+            outputTextEl.innerHTML = cleanHtml;
+          } catch (e) {
+            console.error("SaaS Dashboard parsing failed", e);
+          }
+        }
+      }
+    });
+  </script>
 {% endblock %}

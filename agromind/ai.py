@@ -1,11 +1,167 @@
 import base64
 import os
 import re
+import httpx
 
 from fastapi import UploadFile
 
 from agromind.models import default_groq_model, detect_language_from_text, get_language, resolve_response_language
 from agromind.prompts import build_system_prompt, build_user_prompt, fallback_response
+
+
+async def fetch_environmental_context(location_str: str) -> str:
+    if not location_str or not location_str.strip():
+        return ""
+    
+    lat, lon = None, None
+    resolved_address = None
+    
+    # Check if input is already lat, lon
+    try:
+        parts = location_str.split(",")
+        if len(parts) == 2:
+            lat_val = float(parts[0].strip())
+            lon_val = float(parts[1].strip())
+            if -90 <= lat_val <= 90 and -180 <= lon_val <= 180:
+                lat, lon = lat_val, lon_val
+    except Exception:
+        pass
+
+    # OpenStreetMap Nominatim Geocoding
+    if lat is None or lon is None:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                headers = {"User-Agent": "AgroMind/1.0 (contact@agromind.ai)"}
+                resp = await client.get(
+                    "https://nominatim.openstreetmap.org/search",
+                    params={"q": location_str, "format": "json", "limit": 1},
+                    headers=headers
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data:
+                        lat = float(data[0]["lat"])
+                        lon = float(data[0]["lon"])
+                        resolved_address = data[0].get("display_name")
+        except Exception as e:
+            print(f"Nominatim error: {e}")
+
+    if lat is None or lon is None:
+        return ""
+
+    weather_data = {}
+    soil_data = {}
+    nasa_data = {}
+
+    # Open-Meteo API
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://api.open-meteo.com/v1/forecast",
+                params={
+                    "latitude": lat,
+                    "longitude": lon,
+                    "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,showers_sum,snowfall_sum",
+                    "current_weather": "true",
+                    "timezone": "auto"
+                }
+            )
+            if resp.status_code == 200:
+                weather_data = resp.json()
+    except Exception as e:
+        print(f"Open-Meteo error: {e}")
+
+    # SoilGrids API
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://rest.isric.org/soilgrids/v2.0/properties/query",
+                params={
+                    "lon": lon,
+                    "lat": lat,
+                    "property": ["phh2o", "nitrogen", "soc"],
+                    "depth": "0-5cm",
+                    "value": "mean"
+                }
+            )
+            if resp.status_code == 200:
+                raw_soil = resp.json()
+                properties = raw_soil.get("properties", {})
+                layers = properties.get("layers", [])
+                for layer in layers:
+                    name = layer.get("name")
+                    depths = layer.get("depths", [])
+                    if depths:
+                        values = depths[0].get("values", {})
+                        mean_val = values.get("mean")
+                        if mean_val is not None:
+                            if name == "phh2o":
+                                soil_data["pH"] = mean_val / 10.0
+                            elif name == "nitrogen":
+                                soil_data["nitrogen"] = mean_val
+                            elif name == "soc":
+                                soil_data["organic_carbon"] = mean_val / 10.0
+    except Exception as e:
+        print(f"SoilGrids error: {e}")
+
+    # NASA POWER API
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://power.larc.nasa.gov/api/temporal/daily/point",
+                params={
+                    "parameters": "ALLSKY_SNDN,T2M,RH2M",
+                    "community": "AG",
+                    "longitude": lon,
+                    "latitude": lat,
+                    "start": "20260510",
+                    "end": "20260520",
+                    "format": "JSON"
+                }
+            )
+            if resp.status_code == 200:
+                nasa_data = resp.json()
+    except Exception as e:
+        print(f"NASA POWER error: {e}")
+
+    # Compile a beautiful context summary
+    lines = []
+    lines.append(f"Latitude: {lat}, Longitude: {lon}")
+    if resolved_address:
+        lines.append(f"Resolved Address: {resolved_address}")
+    
+    if weather_data:
+        curr = weather_data.get("current_weather", {})
+        if curr:
+            lines.append(f"Current Live Weather: Temp={curr.get('temperature')}C, WindSpeed={curr.get('windspeed')} km/h, Code={curr.get('weathercode')}")
+        daily = weather_data.get("daily", {})
+        if daily:
+            lines.append("7-Day Forecast:")
+            dates = daily.get("time", [])
+            t_max = daily.get("temperature_2m_max", [])
+            t_min = daily.get("temperature_2m_min", [])
+            prec = daily.get("precipitation_sum", [])
+            for i in range(min(len(dates), 7)):
+                lines.append(f"  - {dates[i]}: Max={t_max[i]}C, Min={t_min[i]}C, Rain={prec[i]}mm")
+                
+    if soil_data:
+        lines.append("Soil Analytics:")
+        if "pH" in soil_data:
+            lines.append(f"  - Soil pH: {soil_data['pH']} (Target: 6.0-7.5)")
+        if "nitrogen" in soil_data:
+            lines.append(f"  - Nitrogen Content: {soil_data['nitrogen']} mg/kg")
+        if "organic_carbon" in soil_data:
+            lines.append(f"  - Soil Organic Carbon: {soil_data['organic_carbon']} g/kg")
+
+    if nasa_data:
+        properties = nasa_data.get("properties", {})
+        parameter = properties.get("parameter", {})
+        sol = parameter.get("ALLSKY_SNDN", {})
+        if sol:
+            avg_sol = sum(sol.values()) / max(len(sol), 1)
+            lines.append(f"10-Day Avg Solar Radiation: {avg_sol:.2f} W/m2")
+
+    return "\n".join(lines)
 
 
 class AIProviderError(RuntimeError):
@@ -28,8 +184,12 @@ async def summarize_file(file: UploadFile | None) -> tuple[str | None, str | Non
 
 def gemini_model_candidates() -> list[str]:
     values = [
-        os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite"),
+        os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"),
         "gemini-2.5-flash-lite",
+        "gemini-2.5-flash",
+        "gemini-flash-latest",
+        "gemini-3.5-flash",
+        "gemini-3.1-flash-lite",
         "gemini-2.0-flash-lite",
         "gemini-1.5-flash",
     ]
@@ -129,6 +289,16 @@ async def generate_ai_response(
     plan: str = "starter",
 ) -> tuple[str, str, str]:
     fields_copy = fields.copy()
+    if tool_id == "agriculture-tools":
+        loc_str = fields.get("location", "")
+        if not loc_str:
+            # Fallback to state or market district if location not provided
+            loc_str = fields.get("state", "") or fields.get("marketDistrict", "")
+        if loc_str:
+            env_ctx = await fetch_environmental_context(loc_str)
+            if env_ctx:
+                fields_copy["live_environmental_telemetry"] = env_ctx
+
     if tool_id == "youtube-learning-tool":
         url = fields.get("url", "").strip()
         if not url:

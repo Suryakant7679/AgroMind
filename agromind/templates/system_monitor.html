@@ -1,0 +1,676 @@
+{% extends "base.html" %}
+{% block content %}
+  <!-- Local Scoped Styles for DevOps control center layout -->
+  <style>
+    .monitor-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .metrics-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .metric-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1.2rem;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.015);
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      transition: transform 0.2s;
+    }
+    .metric-panel:hover {
+      transform: translateY(-2px);
+    }
+    .metric-panel strong {
+      font-size: 1.8rem;
+      font-weight: 850;
+      color: var(--primary);
+    }
+    .env-section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1.2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.015);
+    }
+    .env-row {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 1fr 2.5fr;
+      gap: 1rem;
+      padding: 0.75rem 0;
+      border-top: 1px solid var(--line);
+      align-items: center;
+      font-size: 0.88rem;
+    }
+    .env-row:first-of-type {
+      border-top: none;
+      padding-top: 0;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+    }
+    .env-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-align: center;
+    }
+    .env-badge.configured {
+      background: rgba(16, 185, 129, 0.1);
+      color: #10b981;
+    }
+    .env-badge.missing {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+    }
+    .env-badge.optional {
+      background: rgba(245, 158, 11, 0.1);
+      color: #f59e0b;
+    }
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+    .service-card {
+      background: var(--panel);
+      border: 2px solid var(--line);
+      border-radius: 14px;
+      padding: 1.4rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.015);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .service-card.connected {
+      border-color: rgba(16, 185, 129, 0.4);
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.03);
+    }
+    .service-card.fallback_active {
+      border-color: rgba(245, 158, 11, 0.45);
+      box-shadow: 0 4px 15px rgba(245, 158, 11, 0.03);
+    }
+    .service-card.failed {
+      border-color: rgba(239, 68, 68, 0.4);
+      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.03);
+    }
+    .service-card:hover {
+      transform: translateY(-4px);
+    }
+    .service-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 0.65rem;
+    }
+    .status-pill {
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .status-pill.connected {
+      background: #10b981;
+      color: white;
+    }
+    .status-pill.fallback_active {
+      background: #f59e0b;
+      color: white;
+    }
+    .status-pill.failed {
+      background: #ef4444;
+      color: white;
+    }
+    .status-pill.idle {
+      background: var(--muted);
+      color: white;
+    }
+    .latency-bar-container {
+      margin: 0.5rem 0;
+    }
+    .latency-bar {
+      height: 6px;
+      background: rgba(0,0,0,0.05);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .latency-bar span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      background: var(--muted);
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .latency-bar.green span { background: #10b981; }
+    .latency-bar.yellow span { background: #f59e0b; }
+    .latency-bar.red span { background: #ef4444; }
+    
+    /* Micro monospaced debug console logs style */
+    .debug-console {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.72rem;
+      line-height: 1.5;
+      overflow-x: auto;
+      max-height: 150px;
+      border: 1px solid #1e293b;
+      margin-top: 0.5rem;
+      display: none;
+      white-space: pre-wrap;
+    }
+    .debug-toggle-btn {
+      background: none;
+      border: none;
+      color: var(--primary);
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      outline: none;
+    }
+    .debug-toggle-btn:hover {
+      text-decoration: underline;
+    }
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid white;
+      border-radius: 50%;
+      border-top-color: transparent;
+      animation: spin 0.8s linear infinite;
+      margin-right: 4px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    /* Toast alerts */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .toast {
+      background: #0f172a;
+      color: white;
+      border-left: 4px solid #ef4444;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+      transform: translateY(20px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  </style>
+
+  <div class="monitor-header">
+    <div>
+      <span class="badge">AgroMind DevOps Operations</span>
+      <h1 style="margin: 4px 0 0 0;">Integration Testing & Diagnostics</h1>
+      <p class="muted" style="margin:2px 0 0 0;">Real-time API latency validations, credentials auditing, and failure recovery checks.</p>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button type="button" class="button" id="btn-run-all" onclick="triggerHealthChecks()">
+        <span class="spinner" id="run-all-spinner" style="display:none;"></span>
+        <span>Run All Tests</span>
+      </button>
+      <button type="button" class="button secondary" id="btn-retest-failed" onclick="retestFailedServices()" disabled style="opacity: 0.6;">
+        Retest Failed Services
+      </button>
+    </div>
+  </div>
+
+  <!-- Operational Diagnostics Metrics Panel -->
+  <div class="metrics-bar">
+    <div class="metric-panel">
+      <span class="muted" style="font-size:0.7rem; font-weight:700; text-transform:uppercase;">System Status</span>
+      <strong id="system-status-summary">Idle</strong>
+      <span style="font-size:0.72rem; color:var(--muted); font-weight:600;">Check queue is currently inactive.</span>
+    </div>
+    <div class="metric-panel">
+      <span class="muted" style="font-size:0.7rem; font-weight:700; text-transform:uppercase;">Server Uptime</span>
+      <strong>{{ uptime }}</strong>
+      <span style="font-size:0.72rem; color:var(--muted); font-weight:600;">FastAPI daemon active runtime.</span>
+    </div>
+    <div class="metric-panel">
+      <span class="muted" style="font-size:0.7rem; font-weight:700; text-transform:uppercase;">Active Integrations</span>
+      <strong id="active-integrations-count">0 / 6</strong>
+      <span style="font-size:0.72rem; color:var(--muted); font-weight:600;">Services tested successfully.</span>
+    </div>
+  </div>
+
+  <!-- Credentials Auditor Section -->
+  <div class="env-section">
+    <h3 style="margin-top:0; font-size:1.05rem; font-weight:800; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+      <span>🔑 Environment Key Audit Registry</span>
+      <span class="badge" style="background:rgba(15,118,110,0.08); font-size:0.65rem;">Environment Settings</span>
+    </h3>
+    <div class="env-row">
+      <div>Variable Name</div>
+      <div>Required / Optional</div>
+      <div>Status Check</div>
+      <div>Description</div>
+    </div>
+    {% for key, val in env_status.items() %}
+      <div class="env-row">
+        <code style="color:var(--primary); font-weight:700;">{{ val.name }}</code>
+        <div>
+          <span style="font-weight:700; font-size:0.8rem; color:{% if val.type == 'Required' %}#0f172a{% else %}var(--muted){% endif %};">
+            {{ val.type }}
+          </span>
+        </div>
+        <div>
+          <span class="env-badge {% if val.status == 'configured' %}configured{% elif 'fallback' in val.status %}optional{% else %}missing{% endif %}">
+            {{ val.status }}
+          </span>
+        </div>
+        <div class="muted" style="font-size:0.78rem;">{{ val.description }}</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- Service Verification Panels Grid -->
+  <div class="services-grid">
+    
+    <!-- Service 1: Open-Meteo -->
+    <div class="service-card" id="card-open_meteo">
+      <div>
+        <div class="service-header">
+          <h3 style="margin:0; font-size:0.95rem; font-weight:800;">Open-Meteo API</h3>
+          <span class="status-pill idle" id="pill-open_meteo">Idle</span>
+        </div>
+        <div class="latency-bar-container">
+          <div style="display:flex; justify-content:space-between; font-size:0.7rem; font-weight:700;">
+            <span class="muted">Connection Latency</span>
+            <span id="latency-val-open_meteo">N/A</span>
+          </div>
+          <div class="latency-bar" id="bar-open_meteo">
+            <span></span>
+          </div>
+        </div>
+        <p class="muted" id="msg-open_meteo" style="font-size:0.78rem; line-height:1.4; margin:0.5rem 0 0 0;">
+          Weather forecast retrieval, daily rainfall, temperature, and wind latency checker. (No key required)
+        </p>
+      </div>
+      <div>
+        <button type="button" class="debug-toggle-btn" onclick="toggleDebugConsole('open_meteo')">
+          <span id="arrow-open_meteo">▶</span> Show Connection Console
+        </button>
+        <div class="debug-console" id="console-open_meteo">No console output generated yet.</div>
+      </div>
+    </div>
+
+    <!-- Service 2: SoilGrids -->
+    <div class="service-card" id="card-soilgrids">
+      <div>
+        <div class="service-header">
+          <h3 style="margin:0; font-size:0.95rem; font-weight:800;">SoilGrids Database API</h3>
+          <span class="status-pill idle" id="pill-soilgrids">Idle</span>
+        </div>
+        <div class="latency-bar-container">
+          <div style="display:flex; justify-content:space-between; font-size:0.7rem; font-weight:700;">
+            <span class="muted">Connection Latency</span>
+            <span id="latency-val-soilgrids">N/A</span>
+          </div>
+          <div class="latency-bar" id="bar-soilgrids">
+            <span></span>
+          </div>
+        </div>
+        <p class="muted" id="msg-soilgrids" style="font-size:0.78rem; line-height:1.4; margin:0.5rem 0 0 0;">
+          ISRIC SoilGrids pH, nitrogen levels, organic carbon telemetry resolver. (No key required)
+        </p>
+      </div>
+      <div>
+        <button type="button" class="debug-toggle-btn" onclick="toggleDebugConsole('soilgrids')">
+          <span id="arrow-soilgrids">▶</span> Show Connection Console
+        </button>
+        <div class="debug-console" id="console-soilgrids">No console output generated yet.</div>
+      </div>
+    </div>
+
+    <!-- Service 3: Nominatim -->
+    <div class="service-card" id="card-nominatim">
+      <div>
+        <div class="service-header">
+          <h3 style="margin:0; font-size:0.95rem; font-weight:800;">OSM Nominatim API</h3>
+          <span class="status-pill idle" id="pill-nominatim">Idle</span>
+        </div>
+        <div class="latency-bar-container">
+          <div style="display:flex; justify-content:space-between; font-size:0.7rem; font-weight:700;">
+            <span class="muted">Connection Latency</span>
+            <span id="latency-val-nominatim">N/A</span>
+          </div>
+          <div class="latency-bar" id="bar-nominatim">
+            <span></span>
+          </div>
+        </div>
+        <p class="muted" id="msg-nominatim" style="font-size:0.78rem; line-height:1.4; margin:0.5rem 0 0 0;">
+          OpenStreetMap reverse-geocoder location resolver and GPS coordinates parser. (No key required)
+        </p>
+      </div>
+      <div>
+        <button type="button" class="debug-toggle-btn" onclick="toggleDebugConsole('nominatim')">
+          <span id="arrow-nominatim">▶</span> Show Connection Console
+        </button>
+        <div class="debug-console" id="console-nominatim">No console output generated yet.</div>
+      </div>
+    </div>
+
+    <!-- Service 4: Groq -->
+    <div class="service-card" id="card-groq">
+      <div>
+        <div class="service-header">
+          <h3 style="margin:0; font-size:0.95rem; font-weight:800;">Groq Inference API</h3>
+          <span class="status-pill idle" id="pill-groq">Idle</span>
+        </div>
+        <div class="latency-bar-container">
+          <div style="display:flex; justify-content:space-between; font-size:0.7rem; font-weight:700;">
+            <span class="muted">Connection Latency</span>
+            <span id="latency-val-groq">N/A</span>
+          </div>
+          <div class="latency-bar" id="bar-groq">
+            <span></span>
+          </div>
+        </div>
+        <p class="muted" id="msg-groq" style="font-size:0.78rem; line-height:1.4; margin:0.5rem 0 0 0;">
+          Speech-to-text Whisper transcription latency and advanced Llama AI reasoning check. (Requires GROQ_API_KEY)
+        </p>
+      </div>
+      <div>
+        <button type="button" class="debug-toggle-btn" onclick="toggleDebugConsole('groq')">
+          <span id="arrow-groq">▶</span> Show Connection Console
+        </button>
+        <div class="debug-console" id="console-groq">No console output generated yet.</div>
+      </div>
+    </div>
+
+    <!-- Service 5: Gemini Fallback -->
+    <div class="service-card" id="card-gemini">
+      <div>
+        <div class="service-header">
+          <h3 style="margin:0; font-size:0.95rem; font-weight:800;">Gemini Multimodal Vision</h3>
+          <span class="status-pill idle" id="pill-gemini">Idle</span>
+        </div>
+        <div class="latency-bar-container">
+          <div style="display:flex; justify-content:space-between; font-size:0.7rem; font-weight:700;">
+            <span class="muted">Connection Latency</span>
+            <span id="latency-val-gemini">N/A</span>
+          </div>
+          <div class="latency-bar" id="bar-gemini">
+            <span></span>
+          </div>
+        </div>
+        <p class="muted" id="msg-gemini" style="font-size:0.78rem; line-height:1.4; margin:0.5rem 0 0 0;">
+          Multimodal vision checks for tomato/leaf diseases. Serves as primary fallback if Plant.id is offline. (Requires GEMINI_API_KEY)
+        </p>
+      </div>
+      <div>
+        <button type="button" class="debug-toggle-btn" onclick="toggleDebugConsole('gemini')">
+          <span id="arrow-gemini">▶</span> Show Connection Console
+        </button>
+        <div class="debug-console" id="console-gemini">No console output generated yet.</div>
+      </div>
+    </div>
+
+    <!-- Service 6: Agmarknet -->
+    <div class="service-card" id="card-agmarknet">
+      <div>
+        <div class="service-header">
+          <h3 style="margin:0; font-size:0.95rem; font-weight:800;">Agmarknet Mandi API</h3>
+          <span class="status-pill idle" id="pill-agmarknet">Idle</span>
+        </div>
+        <div class="latency-bar-container">
+          <div style="display:flex; justify-content:space-between; font-size:0.7rem; font-weight:700;">
+            <span class="muted">Connection Latency</span>
+            <span id="latency-val-agmarknet">N/A</span>
+          </div>
+          <div class="latency-bar" id="bar-agmarknet">
+            <span></span>
+          </div>
+        </div>
+        <p class="muted" id="msg-agmarknet" style="font-size:0.78rem; line-height:1.4; margin:0.5rem 0 0 0;">
+          Government daily mandi price lookup check. Cascades gracefully to local index database if key is missing. (Optional)
+        </p>
+      </div>
+      <div>
+        <button type="button" class="debug-toggle-btn" onclick="toggleDebugConsole('agmarknet')">
+          <span id="arrow-agmarknet">▶</span> Show Connection Console
+        </button>
+        <div class="debug-console" id="console-agmarknet">No console output generated yet.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Toast Failure Alerts Container -->
+  <div class="toast-container" id="toast-alerts-box"></div>
+
+  <script>
+    let activeFailedServices = [];
+
+    // Toggles console logs console
+    function toggleDebugConsole(service) {
+      const consoleEl = document.getElementById("console-" + service);
+      const arrowEl = document.getElementById("arrow-" + service);
+      if (!consoleEl || !arrowEl) return;
+      
+      const isOpen = consoleEl.style.display === "block";
+      consoleEl.style.display = isOpen ? "none" : "block";
+      arrowEl.textContent = isOpen ? "▶" : "▼";
+    }
+
+    // Displays developer alert warnings
+    function showToastAlert(serviceName, message) {
+      const box = document.getElementById("toast-alerts-box");
+      if (!box) return;
+      
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      toast.innerHTML = `⚠️ <strong>${serviceName} check failed:</strong> ${message}`;
+      box.appendChild(toast);
+      
+      setTimeout(() => { toast.classList.add("show"); }, 50);
+      setTimeout(() => {
+        toast.classList.remove("show");
+        setTimeout(() => { toast.remove(); }, 400);
+      }, 5000);
+    }
+
+    // Launches parallelized active checks
+    async function triggerHealthChecks() {
+      const btn = document.getElementById("btn-run-all");
+      const spinner = document.getElementById("run-all-spinner");
+      const btnRetest = document.getElementById("btn-retest-failed");
+      const summaryStatus = document.getElementById("system-status-summary");
+      const activeCount = document.getElementById("active-integrations-count");
+
+      if (btn) btn.disabled = true;
+      if (spinner) spinner.style.display = "inline-block";
+      if (summaryStatus) summaryStatus.textContent = "Checking...";
+      if (activeCount) activeCount.textContent = "Gathering...";
+
+      activeFailedServices = [];
+      const services = ["open_meteo", "soilgrids", "nominatim", "groq", "gemini", "agmarknet"];
+
+      // Setup loading states
+      services.forEach(service => {
+        const pill = document.getElementById("pill-" + service);
+        const card = document.getElementById("card-" + service);
+        const latencyVal = document.getElementById("latency-val-" + service);
+        const barSpan = document.querySelector("#bar-" + service + " span");
+
+        if (pill) {
+          pill.className = "status-pill idle";
+          pill.textContent = "Testing...";
+        }
+        if (card) {
+          card.classList.remove("connected", "fallback_active", "failed");
+        }
+        if (latencyVal) latencyVal.textContent = "Measuring...";
+        if (barSpan) {
+          barSpan.style.width = "40%";
+          barSpan.parentNode.className = "latency-bar";
+        }
+      });
+
+      try {
+        const formData = new FormData();
+        formData.append("csrf_token", globalCsrfToken);
+
+        const response = await fetch("/api/health-check", {
+          method: "POST",
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error("System check suite endpoint returned an error.");
+        }
+
+        const data = await response.json();
+        const results = data.results || {};
+        let successCount = 0;
+
+        services.forEach(service => {
+          const res = results[service] || { status: "failed", latency: 0, message: "System timeout", details: "Check failed.", debug: "Network timeout." };
+          const pill = document.getElementById("pill-" + service);
+          const card = document.getElementById("card-" + service);
+          const msg = document.getElementById("msg-" + service);
+          const latencyVal = document.getElementById("latency-val-" + service);
+          const barSpan = document.querySelector("#bar-" + service + " span");
+          const consoleEl = document.getElementById("console-" + service);
+
+          // Update Status
+          if (pill) {
+            pill.textContent = res.status.replace("_", " ");
+            pill.className = "status-pill " + res.status;
+          }
+          if (card) {
+            card.classList.add(res.status);
+          }
+          if (msg) {
+            msg.innerHTML = `<strong>${res.message}</strong><br>${res.details}`;
+          }
+          if (latencyVal) {
+            latencyVal.textContent = res.latency > 0 ? `${res.latency}ms` : "N/A";
+          }
+          
+          // Width and coloring mapping for progress bar
+          if (barSpan) {
+            const pct = Math.max(10, Math.min(100, (res.latency / 1200) * 100));
+            barSpan.style.width = res.latency > 0 ? `${pct}%` : "100%";
+            
+            const colorClass = res.status === "connected" ? "green" : res.status === "fallback_active" ? "yellow" : "red";
+            barSpan.parentNode.className = "latency-bar " + colorClass;
+          }
+
+          // Dumps raw connection debug logs
+          if (consoleEl) {
+            consoleEl.textContent = res.debug || "No diagnostics resolved.";
+          }
+
+          if (res.status === "connected" || res.status === "fallback_active") {
+            successCount++;
+          } else {
+            activeFailedServices.push(service);
+            showToastAlert(service.replace("_", " ").toUpperCase(), res.details);
+          }
+        });
+
+        // Set summary results
+        if (summaryStatus) {
+          if (successCount === 6) {
+            summaryStatus.textContent = "Optimal";
+            summaryStatus.style.color = "#10b981";
+          } else if (activeFailedServices.length > 0) {
+            summaryStatus.textContent = "Alert Active";
+            summaryStatus.style.color = "#ef4444";
+          } else {
+            summaryStatus.textContent = "Active";
+            summaryStatus.style.color = "#f59e0b";
+          }
+        }
+        if (activeCount) activeCount.textContent = `${successCount} / 6 OK`;
+
+        // Retest fail trigger rules
+        if (btnRetest) {
+          if (activeFailedServices.length > 0) {
+            btnRetest.disabled = false;
+            btnRetest.style.opacity = "1";
+          } else {
+            btnRetest.disabled = true;
+            btnRetest.style.opacity = "0.6";
+          }
+        }
+
+      } catch (err) {
+        console.error("Health Check suite collapsed", err);
+        if (summaryStatus) {
+          summaryStatus.textContent = "Offline";
+          summaryStatus.style.color = "#ef4444";
+        }
+        showToastAlert("DIAGNOSTIC PIPELINE", "The central testing endpoint crashed or rejected the request.");
+      } finally {
+        if (btn) btn.disabled = false;
+        if (spinner) spinner.style.display = "none";
+      }
+    }
+
+    // Retest ONLY failed items to conserve quota
+    async function retestFailedServices() {
+      if (activeFailedServices.length === 0) return;
+      
+      const summaryStatus = document.getElementById("system-status-summary");
+      if (summaryStatus) summaryStatus.textContent = "Retesting Alerts...";
+      
+      // We just call the main handler which runs a full check suite to keep execution extremely robust
+      await triggerHealthChecks();
+    }
+
+    // Auto-run validations on page render to immediately present status
+    document.addEventListener("DOMContentLoaded", () => {
+      triggerHealthChecks();
+    });
+  </script>
+{% endblock %}
