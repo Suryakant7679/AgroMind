@@ -449,9 +449,11 @@ async def signup_submit(
 
     if not supabase_auth_configured():
         return page(request, "signup.html", next=next, message="Supabase auth is not configured.")
-
     try:
-        confirmation_url = f"{request.url_for('auth_confirmed')}?next={quote(next)}"
+        raw_conf_url = str(request.url_for('auth_confirmed'))
+        if not any(lh in raw_conf_url for lh in ("localhost", "127.0.0.1")):
+            raw_conf_url = raw_conf_url.replace("http://", "https://", 1)
+        confirmation_url = f"{raw_conf_url}?next={quote(next)}"
         verification_method = verification_method if verification_method in {"link", "otp"} else "link"
 
         request.session["signup_email"] = email
