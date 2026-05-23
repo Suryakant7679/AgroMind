@@ -300,6 +300,36 @@
       // --- 1. GLOBAL TEXT-TO-SPEECH (TTS) ENGINE ---
       let activeUtterance = null;
       let activeSpeechButton = null;
+      let activeAudioElement = null;
+
+      function cancelActiveSpeech() {
+        if (activeAudioElement) {
+          activeAudioElement.pause();
+          activeAudioElement = null;
+        }
+        if (activeUtterance) {
+          if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+          }
+          activeUtterance = null;
+        }
+        if (activeSpeechButton) {
+          activeSpeechButton.classList.remove('speaking');
+          const icon = activeSpeechButton.querySelector('.speaker-icon');
+          const label = activeSpeechButton.querySelector('.btn-label');
+          if (icon) icon.textContent = '🔊';
+          if (label) label.textContent = 'Listen';
+          activeSpeechButton = null;
+        }
+        const visualizer = document.getElementById("voice-visualizer");
+        const status = document.getElementById("voice-status");
+        if (visualizer) {
+          visualizer.classList.remove("speaking");
+        }
+        if (status && status.textContent === "Speaking...") {
+          status.textContent = "Idle";
+        }
+      }
 
       function cleanMarkdownAndHtml(text) {
         let cleaned = text.replace(/<[^>]*>/g, ""); // strip html
@@ -309,87 +339,256 @@
       }
 
       function speakText(text, btnElement = null, onEndCallback = null, languageOverride = null) {
-        if (!window.speechSynthesis) {
-          alert("Text-to-speech is not supported in this browser.");
+        if (activeSpeechButton === btnElement && btnElement !== null) {
+          cancelActiveSpeech();
           return;
         }
 
-        if (activeUtterance) {
-          window.speechSynthesis.cancel();
-          if (activeSpeechButton) {
-            activeSpeechButton.classList.remove('speaking');
-            const icon = activeSpeechButton.querySelector('.speaker-icon');
-            const label = activeSpeechButton.querySelector('.btn-label');
-            if (icon) icon.textContent = '🔊';
-            if (label) label.textContent = 'Listen';
-          }
-          if (activeSpeechButton === btnElement) {
-            activeUtterance = null;
-            activeSpeechButton = null;
-            return;
-          }
-        }
+        cancelActiveSpeech();
 
         const cleanedText = cleanMarkdownAndHtml(text);
         if (!cleanedText) return;
 
-        const utterance = new SpeechSynthesisUtterance(cleanedText);
-        activeUtterance = utterance;
-        activeSpeechButton = btnElement;
+        const langCode = languageOverride || assistantLanguage();
+        const isOrpheusSupported = langCode.startsWith("en") || langCode.startsWith("ar");
 
-        if (btnElement) {
-          btnElement.classList.add('speaking');
-          const icon = btnElement.querySelector('.speaker-icon');
-          const label = btnElement.querySelector('.btn-label');
-          if (icon) icon.textContent = '⏹️';
-          if (label) label.textContent = 'Stop';
+        if (isOrpheusSupported) {
+          activeSpeechButton = btnElement;
+          if (btnElement) {
+            btnElement.classList.add('speaking');
+            const icon = btnElement.querySelector('.speaker-icon');
+            const label = btnElement.querySelector('.btn-label');
+            if (icon) icon.textContent = '⏹️';
+            if (label) label.textContent = 'Stop';
+          }
+
+          const formData = new FormData();
+          formData.append("text", cleanedText);
+          formData.append("csrf_token", globalCsrfToken);
+          formData.append("language", langCode);
+
+          fetch("/api/text-to-speech", {
+            method: "POST",
+            body: formData
+          })
+          .then(response => {
+            if (!response.ok) throw new Error("Groq Orpheus TTS failed");
+            return response.blob();
+          })
+          .then(blob => {
+            const audioUrl = URL.createObjectURL(blob);
+            const audio = new Audio(audioUrl);
+            activeAudioElement = audio;
+
+            audio.onended = () => {
+              cancelActiveSpeech();
+              if (onEndCallback) onEndCallback();
+            };
+
+            audio.onerror = (e) => {
+              console.error("Audio playback error, falling back to browser:", e);
+              fallbackToBrowserTts();
+            };
+
+            audio.play().catch(playErr => {
+              console.error("Play failed, falling back to browser:", playErr);
+              fallbackToBrowserTts();
+            });
+          })
+          .catch(err => {
+            console.error("Groq TTS failed, falling back to browser:", err);
+            fallbackToBrowserTts();
+          });
+
+          return;
         }
 
-        utterance.onend = () => {
+        fallbackToBrowserTts();
+
+        function fallbackToBrowserTts() {
+          if (!window.speechSynthesis) {
+            console.log("Text-to-speech is not supported in this browser.");
+            if (onEndCallback) onEndCallback();
+            return;
+          }
+
+          activeSpeechButton = btnElement;
+          const utterance = new SpeechSynthesisUtterance(cleanedText);
+          activeUtterance = utterance;
+
           if (btnElement) {
-            btnElement.classList.remove('speaking');
+            btnElement.classList.add('speaking');
             const icon = btnElement.querySelector('.speaker-icon');
             const label = btnElement.querySelector('.btn-label');
-            if (icon) icon.textContent = '🔊';
-            if (label) label.textContent = 'Listen';
+            if (icon) icon.textContent = '⏹️';
+            if (label) label.textContent = 'Stop';
           }
-          if (activeSpeechButton === btnElement) {
-            activeUtterance = null;
-            activeSpeechButton = null;
-          }
-          if (onEndCallback) onEndCallback();
-        };
 
-        utterance.onerror = (e) => {
-          console.error("Speech Synthesis Error:", e);
-          if (btnElement) {
-            btnElement.classList.remove('speaking');
-            const icon = btnElement.querySelector('.speaker-icon');
-            const label = btnElement.querySelector('.btn-label');
-            if (icon) icon.textContent = '🔊';
-            if (label) label.textContent = 'Listen';
-          }
-          if (activeSpeechButton === btnElement) {
-            activeUtterance = null;
-            activeSpeechButton = null;
-          }
-          if (onEndCallback) onEndCallback();
-        };
+          utterance.onend = () => {
+            cancelActiveSpeech();
+            if (onEndCallback) onEndCallback();
+          };
 
-        utterance.lang = languageOverride || assistantLanguage();
-        const voices = window.speechSynthesis.getVoices();
-        const langPrefix = utterance.lang.split("-")[0];
-        const defaultVoice = voices.find(v => v.lang === utterance.lang) ||
-                             voices.find(v => v.lang.startsWith(langPrefix)) ||
-                             voices.find(v => v.lang.startsWith('en'));
-        if (defaultVoice) utterance.voice = defaultVoice;
+          utterance.onerror = (e) => {
+            console.error("Speech Synthesis Error:", e);
+            cancelActiveSpeech();
+            if (onEndCallback) onEndCallback();
+          };
 
-        window.speechSynthesis.speak(utterance);
+          utterance.lang = langCode;
+          const voices = window.speechSynthesis.getVoices();
+          const langPrefix = utterance.lang.split("-")[0];
+          const defaultVoice = voices.find(v => v.lang === utterance.lang) ||
+                               voices.find(v => v.lang.startsWith(langPrefix)) ||
+                               voices.find(v => v.lang.startsWith('en'));
+          if (defaultVoice) utterance.voice = defaultVoice;
+
+          window.speechSynthesis.speak(utterance);
+        }
+      }
+
+      // --- UNIVERSAL STT CAPTURE VIA GROQ WHISPER OR BROWSER SPEECHRECOGNITION ---
+      let activeMediaRecorder = null;
+      let activeAudioChunks = [];
+      let recordingTimeout = null;
+
+      async function captureSpeechInput({ onStart, onTranscript, onEnd, onError, languageCode }) {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            activeAudioChunks = [];
+            
+            let mimeType = 'audio/webm';
+            if (MediaRecorder.isTypeSupported('audio/webm')) {
+              mimeType = 'audio/webm';
+            } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+              mimeType = 'audio/ogg';
+            } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+              mimeType = 'audio/wav';
+            } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+              mimeType = 'audio/mp4';
+            }
+
+            const options = mimeType ? { mimeType } : {};
+            const mediaRecorder = new MediaRecorder(stream, options);
+            activeMediaRecorder = mediaRecorder;
+
+            mediaRecorder.ondataavailable = (event) => {
+              if (event.data.size > 0) {
+                activeAudioChunks.push(event.data);
+              }
+            };
+
+            mediaRecorder.onstart = () => {
+              if (onStart) onStart();
+              recordingTimeout = setTimeout(() => {
+                stopSpeechCapture();
+              }, 10000);
+            };
+
+            mediaRecorder.onstop = async () => {
+              if (recordingTimeout) clearTimeout(recordingTimeout);
+              stream.getTracks().forEach(track => track.stop());
+
+              const audioBlob = new Blob(activeAudioChunks, { type: mimeType || 'audio/webm' });
+              if (audioBlob.size === 0) {
+                if (onError) onError(new Error("Audio recording is empty"));
+                if (onEnd) onEnd();
+                return;
+              }
+
+              try {
+                const formData = new FormData();
+                formData.append("audio", audioBlob, "audio.webm");
+                formData.append("csrf_token", globalCsrfToken);
+                formData.append("language", languageCode || assistantLanguage());
+
+                const response = await fetch("/api/speech-to-text", {
+                  method: "POST",
+                  body: formData
+                });
+
+                if (!response.ok) {
+                  const errorData = await response.json().catch(() => ({}));
+                  throw new Error(errorData.detail || "Transcription failed");
+                }
+
+                const result = await response.json();
+                if (onTranscript && result.text) {
+                  onTranscript(result.text);
+                } else if (result.text === "") {
+                  console.log("No speech detected.");
+                }
+              } catch (err) {
+                console.error("Groq Whisper Transcription Failed:", err);
+                if (onError) onError(err);
+              } finally {
+                if (onEnd) onEnd();
+              }
+            };
+
+            mediaRecorder.start();
+            return;
+          } catch (micErr) {
+            console.warn("Microphone access denied or error, trying browser SpeechRecognition:", micErr);
+          }
+        }
+
+        if (isSpeechSupported) {
+          try {
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = languageCode || assistantLanguage();
+
+            activeMediaRecorder = {
+              stop: () => recognition.stop()
+            };
+
+            recognition.onstart = () => {
+              if (onStart) onStart();
+            };
+
+            recognition.onresult = (event) => {
+              const resultText = event.results[0][0].transcript;
+              if (onTranscript && resultText) {
+                onTranscript(resultText);
+              }
+            };
+
+            recognition.onend = () => {
+              activeMediaRecorder = null;
+              if (onEnd) onEnd();
+            };
+
+            recognition.onerror = (err) => {
+              console.error("Browser speech recognition error:", err);
+              if (onError) onError(err);
+              activeMediaRecorder = null;
+              if (onEnd) onEnd();
+            };
+
+            recognition.start();
+          } catch (recErr) {
+            console.error("Browser speech recognition startup failed:", recErr);
+            if (onError) onError(recErr);
+            if (onEnd) onEnd();
+          }
+        } else {
+          alert("Speech input is not supported in this browser context. Please allow microphone permissions or use Chrome/Safari.");
+          if (onEnd) onEnd();
+        }
+      }
+
+      function stopSpeechCapture() {
+        if (activeMediaRecorder && typeof activeMediaRecorder.stop === 'function') {
+          activeMediaRecorder.stop();
+        }
+        activeMediaRecorder = null;
       }
 
       // --- 2. DYNAMIC INPUT FIELD VOICE TYPING (STT) ---
       document.addEventListener("DOMContentLoaded", () => {
-        // 1. Initialize Dashboard UI Language
         const savedLanguage = localStorage.getItem(languageStorageKey) || "{{ default_language }}";
         syncLanguageSelectors(savedLanguage);
         
@@ -398,25 +597,17 @@
           globalSelector.addEventListener("change", () => syncLanguageSelectors(globalSelector.value));
         }
 
-        // 2. Initialize AI / Chat Language
         const savedAiLanguage = localStorage.getItem(aiLanguageStorageKey) || savedLanguage;
         syncAiLanguage(savedAiLanguage);
 
-        // Listen for changes in tool page language dropdown
         const toolSelector = document.getElementById("__language");
         if (toolSelector) {
           toolSelector.addEventListener("change", () => syncAiLanguage(toolSelector.value));
         }
 
-        // Listen for changes in assistant language dropdown
         const assistantSelector = document.getElementById("assistant-language");
         if (assistantSelector) {
           assistantSelector.addEventListener("change", () => syncAiLanguage(assistantSelector.value));
-        }
-
-        if (!isSpeechSupported) {
-          console.log("Speech recognition not supported in this browser.");
-          return;
         }
 
         const fields = document.querySelectorAll("textarea, input[type='text']");
@@ -441,7 +632,6 @@
           micBtn.title = "Speak to type";
           wrapper.appendChild(micBtn);
 
-          let recognition = null;
           let isRecording = false;
 
           micBtn.addEventListener("click", (e) => {
@@ -449,48 +639,37 @@
             e.stopPropagation();
 
             if (isRecording) {
-              recognition.stop();
+              stopSpeechCapture();
               return;
             }
 
-            recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.interimResults = false;
-            recognition.lang = assistantLanguage();
-
-            recognition.onstart = () => {
-              isRecording = true;
-              micBtn.classList.add("recording");
-              micBtn.title = "Listening... Click to stop";
-            };
-
-            recognition.onresult = (event) => {
-              const resultText = event.results[0][0].transcript;
-              if (resultText) {
-                const start = field.selectionStart;
-                const end = field.selectionEnd;
-                const value = field.value;
-                field.value = value.substring(0, start) + resultText + value.substring(end);
-                field.selectionStart = field.selectionEnd = start + resultText.length;
-                field.focus();
-                field.dispatchEvent(new Event('input', { bubbles: true }));
+            captureSpeechInput({
+              languageCode: assistantLanguage(),
+              onStart: () => {
+                isRecording = true;
+                micBtn.classList.add("recording");
+                micBtn.title = "Listening... Click to stop";
+              },
+              onTranscript: (resultText) => {
+                if (resultText) {
+                  const start = field.selectionStart;
+                  const end = field.selectionEnd;
+                  const value = field.value;
+                  field.value = value.substring(0, start) + resultText + value.substring(end);
+                  field.selectionStart = field.selectionEnd = start + resultText.length;
+                  field.focus();
+                  field.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+              },
+              onEnd: () => {
+                isRecording = false;
+                micBtn.classList.remove("recording");
+                micBtn.title = "Speak to type";
+              },
+              onError: (err) => {
+                console.error("Speech input error:", err);
               }
-            };
-
-            recognition.onend = () => {
-              isRecording = false;
-              micBtn.classList.remove("recording");
-              micBtn.title = "Speak to type";
-            };
-
-            recognition.onerror = (err) => {
-              console.error("Speech Recognition Error:", err);
-              isRecording = false;
-              micBtn.classList.remove("recording");
-              micBtn.title = "Speak to type";
-            };
-
-            recognition.start();
+            });
           });
         });
       });
@@ -498,7 +677,6 @@
       // --- 3. INTERACTIVE FLOATING VOICE ASSISTANT ---
       let isPanelOpen = false;
       let isListeningAssistant = false;
-      let assistantRecognition = null;
 
       function toggleVoicePanel(e) {
         if (e) {
@@ -520,9 +698,7 @@
           if (isListeningAssistant) {
             stopAssistantListening();
           }
-          if (window.speechSynthesis && activeUtterance) {
-            window.speechSynthesis.cancel();
-          }
+          cancelActiveSpeech();
         }
       }
 
@@ -542,9 +718,7 @@
       }
 
       function stopAssistantListening() {
-        if (assistantRecognition) {
-          assistantRecognition.stop();
-        }
+        stopSpeechCapture();
         isListeningAssistant = false;
         const micBtn = document.getElementById("voice-mic-btn");
         const visualizer = document.getElementById("voice-visualizer");
@@ -552,7 +726,7 @@
 
         if (micBtn) micBtn.classList.remove("active");
         if (visualizer) visualizer.classList.remove("listening");
-        if (status) status.textContent = "Idle";
+        if (status && status.textContent === "Listening...") status.textContent = "Idle";
       }
 
       function toggleVoiceCapture(e) {
@@ -561,96 +735,77 @@
           e.stopPropagation();
         }
 
-        if (!isSpeechSupported) {
-          alert("Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.");
-          return;
-        }
-
         if (isListeningAssistant) {
           stopAssistantListening();
           return;
         }
 
-        if (window.speechSynthesis) {
-          window.speechSynthesis.cancel();
-          const visualizer = document.getElementById("voice-visualizer");
-          if (visualizer) visualizer.classList.remove("speaking");
-        }
-
-        assistantRecognition = new SpeechRecognition();
-        assistantRecognition.continuous = false;
-        assistantRecognition.interimResults = false;
-        assistantRecognition.lang = assistantLanguage();
+        cancelActiveSpeech();
 
         const micBtn = document.getElementById("voice-mic-btn");
         const visualizer = document.getElementById("voice-visualizer");
         const status = document.getElementById("voice-status");
 
-        assistantRecognition.onstart = () => {
-          isListeningAssistant = true;
-          if (micBtn) micBtn.classList.add("active");
-          if (visualizer) visualizer.classList.add("listening");
-          if (status) status.textContent = "Listening...";
-        };
+        captureSpeechInput({
+          languageCode: assistantLanguage(),
+          onStart: () => {
+            isListeningAssistant = true;
+            if (micBtn) micBtn.classList.add("active");
+            if (visualizer) visualizer.classList.add("listening");
+            if (status) status.textContent = "Listening...";
+          },
+          onTranscript: async (queryText) => {
+            if (!queryText) return;
 
-        assistantRecognition.onresult = async (event) => {
-          const queryText = event.results[0][0].transcript;
-          if (!queryText) return;
-
-          appendAssistantMessage(queryText, true);
-          stopAssistantListening();
-
-          if (status) status.textContent = "Processing...";
-          if (visualizer) visualizer.classList.add("listening");
-
-          try {
-            const formData = new FormData();
-            formData.append("query", queryText);
-            formData.append("csrf_token", globalCsrfToken);
-            formData.append("language", assistantLanguage());
-
-            const response = await fetch("/api/voice-assistant", {
-              method: "POST",
-              body: formData
-            });
-
-            if (!response.ok) {
-              throw new Error("Network response error");
-            }
-
-            const data = await response.json();
-            const reply = data.response;
-            const replyLanguage = data.language || assistantLanguage();
-
-            appendAssistantMessage(reply, false);
-            if (visualizer) visualizer.classList.remove("listening");
-
-            if (status) status.textContent = "Speaking...";
-            if (visualizer) visualizer.classList.add("speaking");
-            speakText(reply, null, () => {
-              if (visualizer) visualizer.classList.remove("speaking");
-              if (status) status.textContent = "Idle";
-            }, replyLanguage);
-          } catch (err) {
-            console.error("Voice Assistant Request Failed:", err);
-            appendAssistantMessage("Sorry, I had trouble reaching the AI. Please try again.", false);
-            if (visualizer) visualizer.classList.remove("listening");
-            if (status) status.textContent = "Idle";
-          }
-        };
-
-        assistantRecognition.onerror = (err) => {
-          console.error("Assistant Speech Error:", err);
-          stopAssistantListening();
-        };
-
-        assistantRecognition.onend = () => {
-          if (isListeningAssistant) {
+            appendAssistantMessage(queryText, true);
             stopAssistantListening();
-          }
-        };
 
-        assistantRecognition.start();
+            if (status) status.textContent = "Processing...";
+            if (visualizer) visualizer.classList.add("listening");
+
+            try {
+              const formData = new FormData();
+              formData.append("query", queryText);
+              formData.append("csrf_token", globalCsrfToken);
+              formData.append("language", assistantLanguage());
+
+              const response = await fetch("/api/voice-assistant", {
+                method: "POST",
+                body: formData
+              });
+
+              if (!response.ok) {
+                throw new Error("Network response error");
+              }
+
+              const data = await response.json();
+              const reply = data.response;
+              const replyLanguage = data.language || assistantLanguage();
+
+              appendAssistantMessage(reply, false);
+              if (visualizer) visualizer.classList.remove("listening");
+
+              if (status) status.textContent = "Speaking...";
+              if (visualizer) visualizer.classList.add("speaking");
+              speakText(reply, null, () => {
+                if (visualizer) visualizer.classList.remove("speaking");
+                if (status && status.textContent === "Speaking...") status.textContent = "Idle";
+              }, replyLanguage);
+            } catch (err) {
+              console.error("Voice Assistant Request Failed:", err);
+              appendAssistantMessage("Sorry, I had trouble reaching the AI. Please try again.", false);
+              if (visualizer) visualizer.classList.remove("listening");
+              if (status && status.textContent === "Processing...") status.textContent = "Idle";
+            }
+          },
+          onEnd: () => {
+            stopAssistantListening();
+          },
+          onError: (err) => {
+            console.error("Assistant Speech Input Error:", err);
+            appendAssistantMessage("Sorry, I couldn't hear you clearly. Please try again.", false);
+          }
+        });
       }
 
       async function sendVoiceChatMessage(e) {
@@ -669,10 +824,7 @@
         const visualizer = document.getElementById("voice-visualizer");
         const status = document.getElementById("voice-status");
 
-        if (window.speechSynthesis) {
-          window.speechSynthesis.cancel();
-          if (visualizer) visualizer.classList.remove("speaking");
-        }
+        cancelActiveSpeech();
 
         if (status) status.textContent = "Processing...";
         if (visualizer) visualizer.classList.add("listening");
@@ -703,13 +855,13 @@
           if (visualizer) visualizer.classList.add("speaking");
           speakText(reply, null, () => {
             if (visualizer) visualizer.classList.remove("speaking");
-            if (status) status.textContent = "Idle";
+            if (status && status.textContent === "Speaking...") status.textContent = "Idle";
           }, replyLanguage);
         } catch (err) {
           console.error("Voice Assistant Request Failed:", err);
           appendAssistantMessage("Sorry, I had trouble reaching the AI. Please try again.", false);
           if (visualizer) visualizer.classList.remove("listening");
-          if (status) status.textContent = "Idle";
+          if (status && status.textContent === "Processing...") status.textContent = "Idle";
         }
       }
 

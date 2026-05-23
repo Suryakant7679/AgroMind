@@ -839,7 +839,7 @@ async def speech_to_text(
     if not os.getenv("GROQ_API_KEY"):
         raise HTTPException(status_code=503, detail="Groq API key is not configured.")
 
-    selected_language = resolve_response_language(text, language)
+    selected_language = get_language(language)
     content = await audio.read()
     if not content:
         raise HTTPException(status_code=400, detail="Audio file is empty.")
