@@ -438,7 +438,6 @@ async def signup_submit(
     full_name: str = Form(""),
     email: str = Form(...),
     password: str = Form(...),
-    verification_method: str = Form("link"),
     csrf_token: str = Form(...),
     next: str = Form("/dashboard"),
 ):
@@ -449,32 +448,32 @@ async def signup_submit(
 
     if not supabase_auth_configured():
         return page(request, "signup.html", next=next, message="Supabase auth is not configured.")
+
     try:
         raw_conf_url = str(request.url_for('auth_confirmed'))
         if not any(lh in raw_conf_url for lh in ("localhost", "127.0.0.1")):
             raw_conf_url = raw_conf_url.replace("http://", "https://", 1)
         confirmation_url = f"{raw_conf_url}?next={quote(next)}"
-        verification_method = verification_method if verification_method in {"link", "otp"} else "link"
 
-        request.session["signup_email"] = email
-        request.session["signup_full_name"] = full_name
-        request.session["signup_next"] = next
-        request.session["signup_verification_method"] = verification_method
-
-        if verification_method == "otp":
-            # For OTP method, we temporarily save the password in the session.
-            # We trigger the OTP (magiclink type) to create/verify the user.
-            # Once verified, we will set/upgrade their password.
-            request.session["signup_password"] = password
-            send_signup_otp(email, full_name)
-            request.session["signup_otp_type"] = "magiclink"
-            return RedirectResponse("/verify-otp", status_code=303)
-        else:
-            # For Link method, we register with password first
-            user = sign_up_with_password(email, password, full_name, confirmation_url)
-            if user.get("id") and user.get("email"):
-                insert_profile_if_missing(user["id"], user["email"], full_name)
+        # Attempt to sign up
+        user = sign_up_with_password(email, password, full_name, confirmation_url)
+        if user.get("id") and user.get("email"):
+            insert_profile_if_missing(user["id"], user["email"], full_name)
+            
+            # If email confirmation is disabled in Supabase, an access_token is returned.
+            # We can log them in immediately and redirect straight to the dashboard!
+            if user.get("access_token"):
+                request.session["user"] = user
+                return RedirectResponse(next, status_code=303)
+            
+            # Graceful fallback: if email confirmation is still enabled on Supabase
+            request.session["signup_email"] = email
+            request.session["signup_full_name"] = full_name
+            request.session["signup_next"] = next
+            request.session["signup_verification_method"] = "link"
             return RedirectResponse("/check-email", status_code=303)
+        else:
+            raise RuntimeError("Signup failed to return a valid user ID.")
     except Exception as exc:
         return page(request, "signup.html", next=next, message=str(exc))
 
