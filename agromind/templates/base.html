@@ -500,8 +500,15 @@
               }
 
               try {
-                const formData = new FormData();
-                formData.append("audio", audioBlob, "audio.webm");
+                let fileExtension = "webm";
+                if (mimeType.includes("mp4")) {
+                  fileExtension = "mp4";
+                } else if (mimeType.includes("ogg")) {
+                  fileExtension = "ogg";
+                } else if (mimeType.includes("wav")) {
+                  fileExtension = "wav";
+                }
+                formData.append("audio", audioBlob, `audio.${fileExtension}`);
                 formData.append("csrf_token", globalCsrfToken);
                 formData.append("language", languageCode || assistantLanguage());
 
