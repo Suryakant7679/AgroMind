@@ -338,7 +338,12 @@ async def generate_ai_response(
                 base_url="https://api.groq.com/openai/v1",
                 timeout=45,
             )
-            model = default_groq_model(task)
+            # Dynamic Model Selection based on user prompt/question complexity
+            is_simple_query = len(prompt_text.split()) < 15 and not any(term in prompt_text.lower() for term in REASONING_TERMS)
+            if is_simple_query and task == "text":
+                model = "llama-3.1-8b-instant"  # Ultra-fast and efficient for simple/short queries
+            else:
+                model = default_groq_model(task)
             content = user_prompt
             if image_base64 and mime_type and mime_type.startswith("image/"):
                 model = default_groq_model("vision")

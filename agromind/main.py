@@ -829,8 +829,14 @@ async def voice_assistant(
                 messages.append({"role": msg["role"], "content": msg["content"]})
             messages.append({"role": "user", "content": query})
 
+            # Dynamic Model Selection for Voice Assistant
+            from agromind.ai import REASONING_TERMS
+            query_lower = query.lower()
+            is_simple_voice = len(query.split()) < 12 and not any(term in query_lower for term in REASONING_TERMS)
+            assistant_model = "llama-3.1-8b-instant" if is_simple_voice else default_groq_model("multilingual")
+
             completion = client.chat.completions.create(
-                model=default_groq_model("multilingual"),
+                model=assistant_model,
                 messages=messages,
             )
             response_text = completion.choices[0].message.content or ""
@@ -925,12 +931,23 @@ async def speech_to_text(
         from openai import OpenAI
 
         client = OpenAI(api_key=os.getenv("GROQ_API_KEY"), base_url="https://api.groq.com/openai/v1", timeout=60)
-        transcript = client.audio.transcriptions.create(
-            file=(audio.filename or "audio.webm", content, audio.content_type or "audio/webm"),
-            model=default_groq_model("speech_to_text"),
-            language=selected_language["groq_code"],
-        )
-        return {"text": getattr(transcript, "text", ""), "model": default_groq_model("speech_to_text")}
+        model = default_groq_model("speech_to_text")
+        try:
+            transcript = client.audio.transcriptions.create(
+                file=(audio.filename or "audio.webm", content, audio.content_type or "audio/webm"),
+                model=model,
+                language=selected_language["groq_code"],
+            )
+            return {"text": getattr(transcript, "text", ""), "model": model}
+        except Exception as primary_exc:
+            backup_model = "whisper-large-v3" if model == "whisper-large-v3-turbo" else "whisper-large-v3-turbo"
+            print(f"Primary Whisper model {model} failed: {primary_exc}. Trying backup {backup_model}...")
+            transcript = client.audio.transcriptions.create(
+                file=(audio.filename or "audio.webm", content, audio.content_type or "audio/webm"),
+                model=backup_model,
+                language=selected_language["groq_code"],
+            )
+            return {"text": getattr(transcript, "text", ""), "model": backup_model}
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Groq speech-to-text failed: {exc}") from exc
 
