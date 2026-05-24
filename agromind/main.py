@@ -36,14 +36,10 @@ from agromind.supabase_store import (
     fetch_profiles,
     fetch_recent_outputs,
     insert_profile_if_missing,
-    is_email_delivery_error,
-    resend_signup_otp,
     save_payment,
     save_output,
     save_subscription,
-    send_signup_otp,
     sign_in_with_password,
-    sign_up_with_password,
     supabase_auth_configured,
     supabase_client,
     supabase_database_configured,
@@ -439,8 +435,7 @@ def complete_confirmed_signup(request: Request, email: str, password: str, full_
     insert_profile_if_missing(user["id"], user["email"], full_name)
     signed_in_user = sign_in_with_password(email, password)
     request.session["user"] = signed_in_user
-    for key in ("signup_email", "signup_full_name", "signup_next",
-                "signup_verification_method", "signup_otp_type", "signup_password"):
+    for key in ("signup_email", "signup_full_name", "signup_next", "signup_verification_method", "signup_otp_type", "signup_password"):
         request.session.pop(key, None)
     return RedirectResponse(next, status_code=303)
 
@@ -451,7 +446,6 @@ async def signup_submit(
     full_name: str = Form(""),
     email: str = Form(...),
     password: str = Form(...),
-    verification_method: str = Form("link"),
     csrf_token: str = Form(...),
     next: str = Form("/dashboard"),
 ):
@@ -464,57 +458,7 @@ async def signup_submit(
         return page(request, "signup.html", next=next, message="Supabase auth is not configured.")
 
     try:
-        raw_conf_url = str(request.url_for('auth_confirmed'))
-        if not any(lh in raw_conf_url for lh in ("localhost", "127.0.0.1")):
-            raw_conf_url = raw_conf_url.replace("http://", "https://", 1)
-        confirmation_url = f"{raw_conf_url}?next={quote(next)}"
-
-        if verification_method == "otp":
-            try:
-                send_signup_otp(email, full_name, confirmation_url)
-            except Exception as exc:
-                if is_email_delivery_error(exc):
-                    return complete_confirmed_signup(request, email, password, full_name, next)
-                raise
-            request.session["signup_email"] = email
-            request.session["signup_full_name"] = full_name
-            request.session["signup_next"] = next
-            request.session["signup_password"] = password
-            request.session["signup_verification_method"] = "otp"
-            request.session["signup_otp_type"] = "email"
-            return page(
-                request,
-                "verify_otp.html",
-                email=email,
-                next=next,
-                mode="otp",
-                message=None,
-            )
-
-        # Attempt to sign up
-        try:
-            user = sign_up_with_password(email, password, full_name, confirmation_url)
-        except Exception as exc:
-            if is_email_delivery_error(exc):
-                return complete_confirmed_signup(request, email, password, full_name, next)
-            raise
-        if user.get("id") and user.get("email"):
-            insert_profile_if_missing(user["id"], user["email"], full_name)
-            
-            # If email confirmation is disabled in Supabase, an access_token is returned.
-            # We can log them in immediately and redirect straight to the dashboard!
-            if user.get("access_token"):
-                request.session["user"] = user
-                return RedirectResponse(next, status_code=303)
-            
-            # Graceful fallback: if email confirmation is still enabled on Supabase
-            request.session["signup_email"] = email
-            request.session["signup_full_name"] = full_name
-            request.session["signup_next"] = next
-            request.session["signup_verification_method"] = "link"
-            return RedirectResponse("/check-email", status_code=303)
-        else:
-            raise RuntimeError("Signup failed to return a valid user ID.")
+        return complete_confirmed_signup(request, email, password, full_name, next)
     except Exception as exc:
         return page(request, "signup.html", next=next, message=str(exc))
 

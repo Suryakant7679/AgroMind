@@ -38,63 +38,8 @@ def test_login_rejects_bad_csrf():
         assert response.status_code == 403
 
 
-def test_signup_uses_verification_flow(monkeypatch):
+def test_signup_creates_confirmed_user_and_signs_in(monkeypatch):
     monkeypatch.setattr(main, "supabase_auth_configured", lambda: True)
-    monkeypatch.setattr(
-        main,
-        "sign_up_with_password",
-        lambda email, password, full_name, redirect_to=None: {"id": "user-1", "email": email, "access_token": None},
-    )
-    monkeypatch.setattr(main, "insert_profile_if_missing", lambda user_id, email, full_name: None)
-
-    with client() as test_client:
-        signup_page = test_client.get("/signup")
-        token = csrf_from(signup_page.text)
-        response = test_client.post(
-            "/signup",
-            data={
-                "full_name": "AgroMind User",
-                "email": "new@example.com",
-                "password": "secret123",
-                "verification_method": "link",
-                "csrf_token": token,
-                "next": "/dashboard",
-            },
-        )
-
-    assert response.status_code == 200
-    assert "Check Your Inbox!" in response.text
-    assert "confirmation link" in response.text
-    assert "6-Digit Verification Code" not in response.text
-
-
-def test_signup_otp_flow_shows_otp_page(monkeypatch):
-    monkeypatch.setattr(main, "supabase_auth_configured", lambda: True)
-    monkeypatch.setattr(main, "send_signup_otp", lambda email, full_name, redirect_to=None: None)
-
-    with client() as test_client:
-        signup_page = test_client.get("/signup")
-        token = csrf_from(signup_page.text)
-        response = test_client.post(
-            "/signup",
-            data={
-                "full_name": "AgroMind User",
-                "email": "new@example.com",
-                "password": "secret123",
-                "verification_method": "otp",
-                "csrf_token": token,
-                "next": "/dashboard",
-            },
-        )
-
-    assert response.status_code == 200
-    assert "6-digit OTP code" in response.text
-    assert "6-Digit Verification Code" in response.text
-
-
-def test_signup_email_delivery_failure_creates_confirmed_user(monkeypatch):
-    monkeypatch.setattr(main, "supabase_auth_configured", lambda: True)
-    monkeypatch.setattr(main, "sign_up_with_password", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("Error sending confirmation email")))
     monkeypatch.setattr(main, "create_confirmed_user_with_password", lambda email, password, full_name: {"id": "user-1", "email": email})
     monkeypatch.setattr(main, "insert_profile_if_missing", lambda user_id, email, full_name: None)
     monkeypatch.setattr(main, "sign_in_with_password", lambda email, password: {"id": "user-1", "email": email, "access_token": "token"})
@@ -108,7 +53,6 @@ def test_signup_email_delivery_failure_creates_confirmed_user(monkeypatch):
                 "full_name": "AgroMind User",
                 "email": "new@example.com",
                 "password": "secret123",
-                "verification_method": "link",
                 "csrf_token": token,
                 "next": "/dashboard",
             },
@@ -119,31 +63,16 @@ def test_signup_email_delivery_failure_creates_confirmed_user(monkeypatch):
     assert response.headers["location"] == "/dashboard"
 
 
-def test_signup_otp_delivery_failure_creates_confirmed_user(monkeypatch):
+def test_signup_page_does_not_show_email_or_otp_verification_options(monkeypatch):
     monkeypatch.setattr(main, "supabase_auth_configured", lambda: True)
-    monkeypatch.setattr(main, "send_signup_otp", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("Error sending confirmation email")))
-    monkeypatch.setattr(main, "create_confirmed_user_with_password", lambda email, password, full_name: {"id": "user-1", "email": email})
-    monkeypatch.setattr(main, "insert_profile_if_missing", lambda user_id, email, full_name: None)
-    monkeypatch.setattr(main, "sign_in_with_password", lambda email, password: {"id": "user-1", "email": email, "access_token": "token"})
 
     with client() as test_client:
-        signup_page = test_client.get("/signup")
-        token = csrf_from(signup_page.text)
-        response = test_client.post(
-            "/signup",
-            data={
-                "full_name": "AgroMind User",
-                "email": "new@example.com",
-                "password": "secret123",
-                "verification_method": "otp",
-                "csrf_token": token,
-                "next": "/dashboard",
-            },
-            follow_redirects=False,
-        )
+        response = test_client.get("/signup")
 
-    assert response.status_code == 303
-    assert response.headers["location"] == "/dashboard"
+    assert response.status_code == 200
+    assert "Email link" not in response.text
+    assert "6-digit OTP" not in response.text
+    assert "Sending verification" not in response.text
 
 
 def test_authenticated_dashboard_renders(monkeypatch):

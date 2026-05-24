@@ -267,6 +267,7 @@ def extract_youtube_video_id(url: str) -> str | None:
 
 
 YOUTUBE_TRANSCRIPT_LANGUAGES = ["en", "en-US", "en-GB", "hi", "es"]
+YOUTUBE_TRANSCRIPT_MAX_CHARS = 18000
 
 
 def transcript_to_text(transcript) -> str:
@@ -334,6 +335,29 @@ def fetch_youtube_transcript_text(video_id: str) -> str | None:
         return None
 
 
+def truncate_youtube_transcript(transcript: str) -> tuple[str, bool]:
+    if len(transcript) <= YOUTUBE_TRANSCRIPT_MAX_CHARS:
+        return transcript, False
+    return transcript[:YOUTUBE_TRANSCRIPT_MAX_CHARS].rsplit(" ", 1)[0], True
+
+
+def fetch_youtube_video_title(url: str) -> str | None:
+    try:
+        response = httpx.get(
+            "https://www.youtube.com/oembed",
+            params={"url": url, "format": "json"},
+            timeout=10.0,
+            follow_redirects=True,
+        )
+        if response.status_code >= 400:
+            return None
+        title = response.json().get("title")
+        return title.strip() if isinstance(title, str) and title.strip() else None
+    except Exception as exc:
+        print(f"Error getting youtube video title: {exc}")
+        return None
+
+
 async def generate_ai_response(
     domain_id: str,
     tool_id: str,
@@ -363,12 +387,23 @@ async def generate_ai_response(
             raise AIProviderError("Invalid YouTube URL. Please verify the link format (e.g., https://www.youtube.com/watch?v=...).")
         
         transcript = fetch_youtube_transcript_text(video_id)
-        if not transcript:
-            raise AIProviderError(
-                "Could not retrieve a transcript for this YouTube video. "
-                "Please verify that the video exists, is public, and has closed captions (CC)/subtitles enabled."
+        if transcript:
+            transcript, was_truncated = truncate_youtube_transcript(transcript)
+            fields_copy["video_transcript"] = transcript
+            if was_truncated:
+                fields_copy["transcript_note"] = (
+                    "The transcript was very long, so only the first section was used. "
+                    "Create useful material from the available transcript and mention that later sections may be missing."
+                )
+        else:
+            title = fetch_youtube_video_title(url)
+            fields_copy["transcript_note"] = (
+                "The YouTube transcript could not be retrieved by the server. "
+                "Generate helpful study material from the available video title, URL, and study goal. "
+                "Clearly state that transcript-based details may be incomplete."
             )
-        fields_copy["video_transcript"] = transcript
+            if title:
+                fields_copy["video_title"] = title
 
     file_summary, image_base64, mime_type = await summarize_file(file)
     prompt_text = " ".join(fields_copy.values())
@@ -482,4 +517,4 @@ async def generate_ai_response(
         except Exception as exc:
             raise AIProviderError("Gemini request failed. Check your API key, quota, and model configuration.") from exc
 
-    return fallback_response(domain_id, tool_id, fields), "local", language["code"]
+    return fallback_response(domain_id, tool_id, fields_copy), "local", language["code"]

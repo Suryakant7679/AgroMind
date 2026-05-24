@@ -1,7 +1,15 @@
+import asyncio
 import sys
 from types import ModuleType
 
-from agromind.ai import extract_youtube_video_id, fetch_youtube_transcript_text
+import agromind.ai as ai
+from agromind.ai import (
+    YOUTUBE_TRANSCRIPT_MAX_CHARS,
+    extract_youtube_video_id,
+    fetch_youtube_transcript_text,
+    generate_ai_response,
+    truncate_youtube_transcript,
+)
 
 
 class Snippet:
@@ -69,3 +77,35 @@ def test_fetch_youtube_transcript_text_falls_back_to_any_available_caption(monke
     install_fake_youtube_module(monkeypatch, FakeFallbackYouTubeTranscriptApi)
 
     assert fetch_youtube_transcript_text("dQw4w9WgXcQ") == "Fallback caption text"
+
+
+def test_truncate_youtube_transcript_limits_large_prompts():
+    transcript = "word " * (YOUTUBE_TRANSCRIPT_MAX_CHARS // 2)
+
+    trimmed, was_truncated = truncate_youtube_transcript(transcript)
+
+    assert was_truncated is True
+    assert len(trimmed) <= YOUTUBE_TRANSCRIPT_MAX_CHARS
+
+
+def test_youtube_generation_falls_back_when_transcript_unavailable(monkeypatch):
+    for key in ("GROQ_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(ai, "fetch_youtube_transcript_text", lambda video_id: None)
+    monkeypatch.setattr(ai, "fetch_youtube_video_title", lambda url: "Readable Video Title")
+
+    output, provider, language = asyncio.run(
+        generate_ai_response(
+            "education",
+            "youtube-learning-tool",
+            {"url": "https://youtu.be/dQw4w9WgXcQ", "goal": "Notes"},
+            None,
+            "en-US",
+            "starter",
+        )
+    )
+
+    assert provider == "local"
+    assert language == "en-US"
+    assert "Readable Video Title" in output
+    assert "transcript could not be retrieved" in output
