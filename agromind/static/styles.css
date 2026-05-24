@@ -199,6 +199,11 @@ a {
   color: var(--primary);
 }
 
+.button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 label {
   display: block;
   color: #334155;
@@ -225,6 +230,39 @@ textarea {
 
 .form-row {
   margin-bottom: 1rem;
+}
+
+.verification-options {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.verification-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  cursor: pointer;
+  padding: 0.8rem;
+}
+
+.verification-option:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.verification-option input {
+  width: auto;
+  margin-top: 0.2rem;
+}
+
+.verification-option small {
+  display: block;
+  color: var(--muted);
+  font-weight: 500;
+  margin-top: 0.2rem;
 }
 
 .field-note {

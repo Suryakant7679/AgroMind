@@ -19,9 +19,35 @@
         <label>Password</label>
         <input name="password" type="password" required minlength="6" placeholder="Minimum 6 characters">
       </div>
+      <div class="form-row">
+        <label>Verification</label>
+        <div class="verification-options">
+          <label class="verification-option">
+            <input type="radio" name="verification_method" value="link" checked>
+            <span>
+              <strong>Email link</strong>
+              <small>Open the confirmation link from your inbox.</small>
+            </span>
+          </label>
+          <label class="verification-option">
+            <input type="radio" name="verification_method" value="otp">
+            <span>
+              <strong>6-digit OTP</strong>
+              <small>Enter a code after it arrives by email.</small>
+            </span>
+          </label>
+        </div>
+      </div>
 
-      <button class="button" type="submit">Sign up</button>
+      <button class="button" type="submit" data-loading-text="Sending verification...">Sign up</button>
     </form>
     <p class="muted" style="margin-top:1rem">Already have an account? <a href="/login">Login</a>.</p>
   </div>
+  <script>
+    document.currentScript.closest(".card").querySelector("form").addEventListener("submit", (event) => {
+      const button = event.currentTarget.querySelector("button[type='submit']");
+      button.disabled = true;
+      button.textContent = button.dataset.loadingText || "Please wait...";
+    });
+  </script>
 {% endblock %}

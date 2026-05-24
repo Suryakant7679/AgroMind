@@ -438,6 +438,7 @@ async def signup_submit(
     full_name: str = Form(""),
     email: str = Form(...),
     password: str = Form(...),
+    verification_method: str = Form("link"),
     csrf_token: str = Form(...),
     next: str = Form("/dashboard"),
 ):
@@ -454,6 +455,23 @@ async def signup_submit(
         if not any(lh in raw_conf_url for lh in ("localhost", "127.0.0.1")):
             raw_conf_url = raw_conf_url.replace("http://", "https://", 1)
         confirmation_url = f"{raw_conf_url}?next={quote(next)}"
+
+        if verification_method == "otp":
+            send_signup_otp(email, full_name, confirmation_url)
+            request.session["signup_email"] = email
+            request.session["signup_full_name"] = full_name
+            request.session["signup_next"] = next
+            request.session["signup_password"] = password
+            request.session["signup_verification_method"] = "otp"
+            request.session["signup_otp_type"] = "email"
+            return page(
+                request,
+                "verify_otp.html",
+                email=email,
+                next=next,
+                mode="otp",
+                message=None,
+            )
 
         # Attempt to sign up
         user = sign_up_with_password(email, password, full_name, confirmation_url)

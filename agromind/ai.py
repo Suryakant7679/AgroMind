@@ -266,45 +266,69 @@ def extract_youtube_video_id(url: str) -> str | None:
     return None
 
 
+YOUTUBE_TRANSCRIPT_LANGUAGES = ["en", "en-US", "en-GB", "hi", "es"]
+
+
+def transcript_to_text(transcript) -> str:
+    text_snippets = []
+    for item in transcript:
+        if hasattr(item, "text"):
+            text_snippets.append(item.text)
+        elif isinstance(item, dict):
+            text_snippets.append(item.get("text", ""))
+        else:
+            try:
+                text_snippets.append(item["text"])
+            except Exception:
+                text_snippets.append(str(item))
+    return " ".join(snippet.strip() for snippet in text_snippets if snippet and snippet.strip())
+
+
+def fetch_first_available_transcript(transcript_list):
+    for finder_name in ("find_transcript", "find_generated_transcript", "find_manually_created_transcript"):
+        finder = getattr(transcript_list, finder_name, None)
+        if not finder:
+            continue
+        try:
+            return finder(YOUTUBE_TRANSCRIPT_LANGUAGES).fetch()
+        except Exception as exc:
+            print(f"YouTube transcript {finder_name} fallback failed: {exc}")
+
+    for transcript in transcript_list:
+        try:
+            return transcript.fetch()
+        except Exception as exc:
+            print(f"YouTube transcript iteration fallback failed: {exc}")
+    return None
+
+
 def fetch_youtube_transcript_text(video_id: str) -> str | None:
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
-        
-        # Newer versions of youtube-transcript-api require instantiation
-        api_instance = None
-        if hasattr(YouTubeTranscriptApi, 'get_transcript'):
+
+        # Newer versions of youtube-transcript-api require instantiation.
+        if hasattr(YouTubeTranscriptApi, "get_transcript"):
             api_instance = YouTubeTranscriptApi
         else:
             api_instance = YouTubeTranscriptApi()
-            
+
         try:
-            if hasattr(api_instance, 'get_transcript'):
-                transcript = api_instance.get_transcript(video_id, languages=['en', 'hi', 'es'])
+            if hasattr(api_instance, "get_transcript"):
+                transcript = api_instance.get_transcript(video_id, languages=YOUTUBE_TRANSCRIPT_LANGUAGES)
             else:
-                transcript = api_instance.fetch(video_id, languages=['en', 'hi', 'es'])
+                transcript = api_instance.fetch(video_id, languages=YOUTUBE_TRANSCRIPT_LANGUAGES)
         except Exception as fetch_exc:
             print(f"First-stage transcript fetch failed: {fetch_exc}. Trying fallback...")
-            if hasattr(api_instance, 'list_transcripts'):
+            if hasattr(api_instance, "list_transcripts"):
                 transcript_list = api_instance.list_transcripts(video_id)
             else:
                 transcript_list = api_instance.list(video_id)
-                
-            transcript = transcript_list.find_transcript([]).fetch()
-            
-        # Support both old versions (dictionaries) and new versions (FetchedTranscriptSnippet objects)
-        text_snippets = []
-        for item in transcript:
-            if hasattr(item, 'text'):
-                text_snippets.append(item.text)
-            elif isinstance(item, dict):
-                text_snippets.append(item.get('text', ''))
-            else:
-                try:
-                    text_snippets.append(item['text'])
-                except Exception:
-                    text_snippets.append(str(item))
-                    
-        return " ".join(text_snippets)
+
+            transcript = fetch_first_available_transcript(transcript_list)
+
+        if not transcript:
+            return None
+        return transcript_to_text(transcript)
     except Exception as e:
         print(f"Error getting youtube transcript: {e}")
         return None
