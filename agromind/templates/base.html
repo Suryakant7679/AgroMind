@@ -454,7 +454,56 @@
       let activeAudioChunks = [];
       let recordingTimeout = null;
 
+      function runBrowserSpeechRecognition({ onStart, onTranscript, onEnd, onError, languageCode }) {
+        try {
+          const recognition = new SpeechRecognition();
+          recognition.continuous = false;
+          recognition.interimResults = false;
+          recognition.lang = languageCode || assistantLanguage();
+
+          activeMediaRecorder = {
+            stop: () => recognition.stop()
+          };
+
+          recognition.onstart = () => {
+            if (onStart) onStart();
+          };
+
+          recognition.onresult = (event) => {
+            const resultText = event.results[0][0].transcript;
+            if (onTranscript && resultText) {
+              onTranscript(resultText);
+            }
+          };
+
+          recognition.onend = () => {
+            activeMediaRecorder = null;
+            if (onEnd) onEnd();
+          };
+
+          recognition.onerror = (err) => {
+            console.error("Browser speech recognition error:", err);
+            if (onError) onError(err);
+            activeMediaRecorder = null;
+            if (onEnd) onEnd();
+          };
+
+          recognition.start();
+        } catch (recErr) {
+          console.error("Browser speech recognition startup failed:", recErr);
+          if (onError) onError(recErr);
+          if (onEnd) onEnd();
+        }
+      }
+
       async function captureSpeechInput({ onStart, onTranscript, onEnd, onError, languageCode }) {
+        const useBrowserSpeech = localStorage.getItem('agromind.use_browser_speech') === 'true';
+
+        if (useBrowserSpeech && isSpeechSupported) {
+          runBrowserSpeechRecognition({ onStart, onTranscript, onEnd, onError, languageCode });
+          return;
+        }
+
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -531,9 +580,19 @@
                 }
               } catch (err) {
                 console.error("Groq Whisper Transcription Failed:", err);
-                if (onError) onError(err);
+                if (isSpeechSupported) {
+                  localStorage.setItem('agromind.use_browser_speech', 'true');
+                  console.log("Configured future speech captures to use browser-native SpeechRecognition.");
+                  alert("Cloud transcription service had an issue. We are switching to your browser's offline speech engine. Please click OK and say something again!");
+                  runBrowserSpeechRecognition({ onStart, onTranscript, onEnd, onError, languageCode });
+                } else {
+                  if (onError) onError(err);
+                  if (onEnd) onEnd();
+                }
               } finally {
-                if (onEnd) onEnd();
+                if (localStorage.getItem('agromind.use_browser_speech') !== 'true') {
+                  if (onEnd) onEnd();
+                }
               }
             };
 
@@ -545,45 +604,7 @@
         }
 
         if (isSpeechSupported) {
-          try {
-            const recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.interimResults = false;
-            recognition.lang = languageCode || assistantLanguage();
-
-            activeMediaRecorder = {
-              stop: () => recognition.stop()
-            };
-
-            recognition.onstart = () => {
-              if (onStart) onStart();
-            };
-
-            recognition.onresult = (event) => {
-              const resultText = event.results[0][0].transcript;
-              if (onTranscript && resultText) {
-                onTranscript(resultText);
-              }
-            };
-
-            recognition.onend = () => {
-              activeMediaRecorder = null;
-              if (onEnd) onEnd();
-            };
-
-            recognition.onerror = (err) => {
-              console.error("Browser speech recognition error:", err);
-              if (onError) onError(err);
-              activeMediaRecorder = null;
-              if (onEnd) onEnd();
-            };
-
-            recognition.start();
-          } catch (recErr) {
-            console.error("Browser speech recognition startup failed:", recErr);
-            if (onError) onError(recErr);
-            if (onEnd) onEnd();
-          }
+          runBrowserSpeechRecognition({ onStart, onTranscript, onEnd, onError, languageCode });
         } else {
           alert("Speech input is not supported in this browser context. Please allow microphone permissions or use Chrome/Safari.");
           if (onEnd) onEnd();
