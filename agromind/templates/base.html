@@ -500,6 +500,7 @@
               }
 
               try {
+                const formData = new FormData();
                 let fileExtension = "webm";
                 if (mimeType.includes("mp4")) {
                   fileExtension = "mp4";
@@ -621,7 +622,7 @@
 
         const fields = document.querySelectorAll("textarea, input[type='text']");
         fields.forEach(field => {
-          if (field.id === "csrf_token" || field.closest('.speech-input-wrapper') || field.name === "email" || field.name === "password" || field.name === "csrf_token") {
+          if (field.id === "csrf_token" || field.id === "voice-chat-input" || field.closest('.speech-input-wrapper') || field.closest('.voice-input-row') || field.name === "email" || field.name === "password" || field.name === "csrf_token") {
             return;
           }
 
