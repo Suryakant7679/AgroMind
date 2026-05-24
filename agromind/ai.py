@@ -269,12 +269,42 @@ def extract_youtube_video_id(url: str) -> str | None:
 def fetch_youtube_transcript_text(video_id: str) -> str | None:
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
+        
+        # Newer versions of youtube-transcript-api require instantiation
+        api_instance = None
+        if hasattr(YouTubeTranscriptApi, 'get_transcript'):
+            api_instance = YouTubeTranscriptApi
+        else:
+            api_instance = YouTubeTranscriptApi()
+            
         try:
-            transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'hi', 'es'])
-        except Exception:
-            list_transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
-            transcript = list_transcripts.find_transcript([]).fetch()
-        return " ".join([item["text"] for item in transcript])
+            if hasattr(api_instance, 'get_transcript'):
+                transcript = api_instance.get_transcript(video_id, languages=['en', 'hi', 'es'])
+            else:
+                transcript = api_instance.fetch(video_id, languages=['en', 'hi', 'es'])
+        except Exception as fetch_exc:
+            print(f"First-stage transcript fetch failed: {fetch_exc}. Trying fallback...")
+            if hasattr(api_instance, 'list_transcripts'):
+                transcript_list = api_instance.list_transcripts(video_id)
+            else:
+                transcript_list = api_instance.list(video_id)
+                
+            transcript = transcript_list.find_transcript([]).fetch()
+            
+        # Support both old versions (dictionaries) and new versions (FetchedTranscriptSnippet objects)
+        text_snippets = []
+        for item in transcript:
+            if hasattr(item, 'text'):
+                text_snippets.append(item.text)
+            elif isinstance(item, dict):
+                text_snippets.append(item.get('text', ''))
+            else:
+                try:
+                    text_snippets.append(item['text'])
+                except Exception:
+                    text_snippets.append(str(item))
+                    
+        return " ".join(text_snippets)
     except Exception as e:
         print(f"Error getting youtube transcript: {e}")
         return None
