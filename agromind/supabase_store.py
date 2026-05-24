@@ -84,6 +84,16 @@ def _database_key() -> str | None:
     return key.strip().strip("'\"") if key else None
 
 
+def _service_role_key() -> str | None:
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    return key.strip().strip("'\"") if key else None
+
+
+def is_email_delivery_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "error sending confirmation email" in message or "could not send otp email" in message
+
+
 def _can_use_python_client(access_token: str | None = None) -> bool:
     if os.getenv("SUPABASE_SERVICE_ROLE_KEY"):
         return True
@@ -155,6 +165,44 @@ def sign_in_with_password(email: str, password: str) -> dict:
     if not user.get("id") or not user.get("email"):
         raise RuntimeError("Supabase did not return a user.")
     return {"id": user["id"], "email": user["email"], "access_token": payload.get("access_token")}
+
+
+def create_confirmed_user_with_password(email: str, password: str, full_name: str = "") -> dict:
+    url = _supabase_url()
+    service_key = _service_role_key()
+    if not url or not service_key:
+        raise RuntimeError("Supabase service role key is required for email delivery fallback.")
+
+    endpoint = f"{url.rstrip('/')}/auth/v1/admin/users"
+    headers = {
+        "apikey": service_key,
+        "Authorization": f"Bearer {service_key}",
+        "Content-Type": "application/json",
+    }
+    response = httpx.post(
+        endpoint,
+        headers=headers,
+        json={
+            "email": email,
+            "password": password,
+            "email_confirm": True,
+            "user_metadata": {"full_name": full_name or "AgroMind User"},
+        },
+        timeout=20,
+    )
+    if response.status_code >= 400:
+        try:
+            err = response.json()
+            err_msg = err.get("error_description") or err.get("msg") or err.get("message") or "Could not create confirmed user."
+        except Exception:
+            err_msg = "Could not create confirmed user."
+        raise RuntimeError(err_msg)
+
+    payload = response.json()
+    user = payload.get("user") or payload
+    if not user.get("id") or not user.get("email"):
+        raise RuntimeError("Supabase did not return a created user.")
+    return {"id": user["id"], "email": user["email"], "access_token": None}
 
 
 def sign_up_with_password(email: str, password: str, full_name: str = "", redirect_to: str | None = None) -> dict:

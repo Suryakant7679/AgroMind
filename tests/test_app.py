@@ -92,6 +92,60 @@ def test_signup_otp_flow_shows_otp_page(monkeypatch):
     assert "6-Digit Verification Code" in response.text
 
 
+def test_signup_email_delivery_failure_creates_confirmed_user(monkeypatch):
+    monkeypatch.setattr(main, "supabase_auth_configured", lambda: True)
+    monkeypatch.setattr(main, "sign_up_with_password", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("Error sending confirmation email")))
+    monkeypatch.setattr(main, "create_confirmed_user_with_password", lambda email, password, full_name: {"id": "user-1", "email": email})
+    monkeypatch.setattr(main, "insert_profile_if_missing", lambda user_id, email, full_name: None)
+    monkeypatch.setattr(main, "sign_in_with_password", lambda email, password: {"id": "user-1", "email": email, "access_token": "token"})
+
+    with client() as test_client:
+        signup_page = test_client.get("/signup")
+        token = csrf_from(signup_page.text)
+        response = test_client.post(
+            "/signup",
+            data={
+                "full_name": "AgroMind User",
+                "email": "new@example.com",
+                "password": "secret123",
+                "verification_method": "link",
+                "csrf_token": token,
+                "next": "/dashboard",
+            },
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/dashboard"
+
+
+def test_signup_otp_delivery_failure_creates_confirmed_user(monkeypatch):
+    monkeypatch.setattr(main, "supabase_auth_configured", lambda: True)
+    monkeypatch.setattr(main, "send_signup_otp", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("Error sending confirmation email")))
+    monkeypatch.setattr(main, "create_confirmed_user_with_password", lambda email, password, full_name: {"id": "user-1", "email": email})
+    monkeypatch.setattr(main, "insert_profile_if_missing", lambda user_id, email, full_name: None)
+    monkeypatch.setattr(main, "sign_in_with_password", lambda email, password: {"id": "user-1", "email": email, "access_token": "token"})
+
+    with client() as test_client:
+        signup_page = test_client.get("/signup")
+        token = csrf_from(signup_page.text)
+        response = test_client.post(
+            "/signup",
+            data={
+                "full_name": "AgroMind User",
+                "email": "new@example.com",
+                "password": "secret123",
+                "verification_method": "otp",
+                "csrf_token": token,
+                "next": "/dashboard",
+            },
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/dashboard"
+
+
 def test_authenticated_dashboard_renders(monkeypatch):
     monkeypatch.setattr(main, "user_from_session", lambda request: {"id": "user-1", "email": "u@example.com"})
     monkeypatch.setattr(main, "fetch_recent_outputs", lambda user_id, access_token=None: [])
