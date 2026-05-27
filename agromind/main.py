@@ -655,7 +655,73 @@ def system_monitor(request: Request):
         }
     }
 
-    return page(request, "system_monitor.html", uptime=uptime_str, env_status=env_status)
+    # Let's check if the user is admin
+    is_admin = False
+    try:
+        profile_data = fetch_profile(user_or_response.get("id"), user_or_response.get("access_token")) or {}
+        if profile_data.get("role") == "admin":
+            is_admin = True
+    except Exception:
+        pass
+
+    # Fetch recent outputs
+    recent = []
+    try:
+        if is_admin:
+            recent = fetch_recent_outputs(limit=50, access_token=user_or_response.get("access_token"))
+        else:
+            recent = fetch_recent_outputs(user_id=user_or_response.get("id"), limit=50, access_token=user_or_response.get("access_token"))
+    except Exception:
+        pass
+
+    # Fetch profiles to map user_id -> email/name
+    profiles_map = {}
+    try:
+        if is_admin:
+            all_users = fetch_profiles() or []
+            for p in all_users:
+                profiles_map[str(p.get("id"))] = p
+        else:
+            profile_data = fetch_profile(user_or_response.get("id"), user_or_response.get("access_token")) or {}
+            profiles_map[str(user_or_response.get("id"))] = profile_data
+    except Exception:
+        pass
+
+    # Group outputs by user details tuple: (name, email)
+    grouped_history = {}
+    for item in recent:
+        item_user_id = str(item.get("user_id"))
+        user_info = profiles_map.get(item_user_id) or {}
+        user_name = user_info.get("full_name") or user_info.get("email") or "AgroMind User"
+        user_email = user_info.get("email") or "unknown@agromind.ai"
+        
+        domain_id = item.get("domain")
+        tool_id = item.get("tool")
+        domain = get_domain(domain_id)
+        tool = get_tool(domain_id, tool_id)
+        
+        raw_date = item.get("created_at")
+        pretty_date = "Recent"
+        if raw_date:
+            parsed = _parse_time(raw_date)
+            if parsed:
+                pretty_date = parsed.strftime("%b %d, %Y - %I:%M %p")
+                
+        enriched_item = {
+            "id": item.get("id"),
+            "domain_id": domain_id,
+            "tool_id": tool_id,
+            "domain_name": domain["name"] if domain else domain_id.replace("-", " ").capitalize(),
+            "tool_title": tool["title"] if tool else tool_id.replace("-", " ").capitalize(),
+            "pretty_date": pretty_date,
+            "tokens_used": item.get("tokens_used", 0)
+        }
+        
+        user_key = (user_name, user_email)
+        grouped_history.setdefault(user_key, [])
+        grouped_history[user_key].append(enriched_item)
+
+    return page(request, "system_monitor.html", uptime=uptime_str, env_status=env_status, grouped_history=grouped_history)
 
 
 @app.post("/api/health-check")

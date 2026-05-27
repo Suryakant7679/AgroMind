@@ -519,9 +519,21 @@ def save_output(
     if client and _can_use_python_client(access_token):
         try:
             client.table("ai_outputs").insert(output_row).execute()
+        except Exception:
+            pass
+        try:
             client.table("usage_events").insert(usage_row).execute()
             return
         except Exception:
+            # Fallback if credits_used does not exist in the live database table
+            if "credits_used" in usage_row:
+                cleaned_row = usage_row.copy()
+                cleaned_row.pop("credits_used", None)
+                try:
+                    client.table("usage_events").insert(cleaned_row).execute()
+                    return
+                except Exception:
+                    pass
             pass
 
     key = _database_key()
@@ -538,9 +550,19 @@ def save_output(
         r2 = httpx.post(_rest_url("usage_events"), headers=_rest_headers(key, access_token), json=usage_row, timeout=20)
         r2.raise_for_status()
     except Exception as exc:
-        print(f"Error saving to usage_events via REST: {exc}")
-        if 'r2' in locals():
-            print(f"usage_events error response: {r2.status_code} - {r2.text}")
+        # Fallback if credits_used does not exist in the live database table
+        if "credits_used" in usage_row:
+            cleaned_row = usage_row.copy()
+            cleaned_row.pop("credits_used", None)
+            try:
+                r2 = httpx.post(_rest_url("usage_events"), headers=_rest_headers(key, access_token), json=cleaned_row, timeout=20)
+                r2.raise_for_status()
+            except Exception as exc_fallback:
+                print(f"Error saving to usage_events via REST fallback: {exc_fallback}")
+        else:
+            print(f"Error saving to usage_events via REST: {exc}")
+            if 'r2' in locals():
+                print(f"usage_events error response: {r2.status_code} - {r2.text}")
 
 
 def fetch_recent_outputs(user_id: str | None = None, limit: int = 5, access_token: str | None = None) -> list[dict]:

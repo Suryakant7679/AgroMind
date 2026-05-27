@@ -484,6 +484,717 @@
 
   </div>
 
+  <!-- Premium Grouped User History Section -->
+  <div class="env-section" style="margin-top: 2.5rem; margin-bottom: 2rem;">
+    <h3 style="margin-top:0; font-size:1.15rem; font-weight:850; margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:center; border-bottom: 1.5px solid var(--line); padding-bottom: 0.75rem;">
+      <span>👥 Grouped User Activity & Output Logs</span>
+      <span class="badge" style="background:rgba(15,118,110,0.08); font-size:0.65rem;">System Auditor</span>
+    </h3>
+
+    {% for user_key, items in grouped_history.items() %}
+      <div class="user-history-group" style="margin-bottom: 2rem; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.015);">
+        
+        <!-- User Group Header -->
+        <div style="background: #f8fafc; padding: 1rem 1.25rem; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <strong style="font-size: 1.02rem; color: #0f172a; font-weight: 850;">{{ user_key[0] }}</strong>
+            <span style="font-size: 0.82rem; color: var(--muted); font-weight: 600; margin-left: 0.5rem;">({{ user_key[1] }})</span>
+          </div>
+          <span class="badge" style="background: rgba(2, 132, 199, 0.08); color: #0284c7; font-weight: 800; font-size: 0.68rem;">
+            {{ items|length }} Assessments logged
+          </span>
+        </div>
+
+        <!-- User Group Items List -->
+        <div style="padding: 0.5rem 1.25rem;">
+          {% for item in items %}
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-top: 1px solid rgba(0,0,0,0.04); flex-wrap: wrap; gap: 1rem; {% if loop.first %}border-top: none;{% endif %}">
+              <div style="display: flex; align-items: center; gap: 1rem; flex-grow: 1;">
+                <span class="badge badge-{{ item.domain_id }}" style="font-size: 0.65rem; font-weight: 800; padding: 2px 8px;">
+                  {% if item.domain_id == 'agriculture' %}🌾 {{ item.domain_name }}
+                  {% elif item.domain_id == 'healthcare' %}🩺 {{ item.domain_name }}
+                  {% else %}🎓 {{ item.domain_name }}{% endif %}
+                </span>
+                <div>
+                  <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #1e293b;">{{ item.tool_title }}</h4>
+                  <span style="font-size: 0.72rem; color: var(--muted); font-weight: 600;">{{ item.pretty_date }}</span>
+                </div>
+              </div>
+              
+              <div style="display: flex; align-items: center; gap: 1.25rem;">
+                <span style="font-size: 0.75rem; font-weight: 800; color: var(--muted); background: rgba(0,0,0,0.03); padding: 3px 8px; border-radius: 6px; font-family: monospace;">
+                  ⚡ {{ item.tokens_used }} tokens
+                </span>
+                <button type="button" class="button secondary" onclick="openHistoryModal('{{ item.id }}')" style="padding: 0.4rem 0.85rem; font-size: 0.78rem; min-height: auto; font-weight: 800; border-radius: 8px;">
+                  Inspect Output
+                </button>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+      </div>
+    {% else %}
+      <div style="text-align: center; padding: 3rem 2rem; border: 2px dashed var(--line); border-radius: 12px; background: transparent;">
+        <span style="font-size: 2.25rem;">📂</span>
+        <h4 style="margin: 0.5rem 0 0.25rem 0; font-weight: 800;">No system logs recorded yet</h4>
+        <p class="muted" style="margin: 0; font-size: 0.8rem;">Run dynamic tests or AI tools to populate operational logs.</p>
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- ========================================== -->
+  <!-- STUNNING INTERACTIVE HISTORY REPORT MODAL -->
+  <!-- ========================================== -->
+  <div id="history-detail-modal" class="hist-modal-overlay" style="display: none;">
+    <div class="hist-modal">
+      
+      <!-- Modal Header -->
+      <div class="hist-modal-header">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <span id="hist-modal-domain" class="badge">Badge</span>
+          <span id="hist-modal-tokens" class="hist-header-tokens">Tokens</span>
+        </div>
+        <h3 id="hist-modal-title" class="hist-modal-title">Tool Title</h3>
+        <p id="hist-modal-date" class="hist-modal-date">Date</p>
+        <button class="hist-close-btn" onclick="closeHistoryModal()">✕</button>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="hist-tabs">
+        <button id="hist-tab-report" class="hist-tab-btn active" onclick="switchHistoryTab('report')">
+          📄 Generated Report
+        </button>
+        <button id="hist-tab-inputs" class="hist-tab-btn" onclick="switchHistoryTab('inputs')">
+          ⚙️ Form Inputs Used
+        </button>
+      </div>
+
+      <!-- Modal Body Content -->
+      <div class="hist-modal-body">
+        
+        <!-- Loading Spinner -->
+        <div id="history-loading-spinner" class="hist-loading-container" style="display: none;">
+          <div class="hist-spinner"></div>
+          <span class="muted" style="font-size: 0.82rem; font-weight: 700;">Decrypting workspace log...</span>
+        </div>
+
+        <!-- Real Content Container -->
+        <div id="history-modal-content" style="display: none; height: 100%;">
+          
+          <!-- Report Tab View -->
+          <div id="hist-tab-content-report" class="hist-tab-panel active">
+            <div id="hist-report-container" class="hist-report-render-box">
+              <!-- Rendered Markdown goes here -->
+            </div>
+          </div>
+
+          <!-- Inputs Tab View -->
+          <div id="hist-tab-content-inputs" class="hist-tab-panel">
+            <div id="hist-inputs-container" class="hist-inputs-render-box">
+              <!-- Inputs Key/Value Grid goes here -->
+            </div>
+          </div>
+          
+        </div>
+      </div>
+
+      <!-- Modal Footer Controls -->
+      <div class="hist-modal-footer">
+        
+        <!-- Audio Read Aloud Control -->
+        <div class="hist-audio-controls">
+          <button id="hist-speak-btn" class="hist-action-btn audio-btn" onclick="toggleHistorySpeech()" title="Read Report Out Loud">
+            🔊 <span id="speak-btn-label">Speak</span>
+          </button>
+        </div>
+
+        <div style="display: flex; gap: 0.6rem;">
+          <button class="button secondary" onclick="closeHistoryModal()">Cancel</button>
+          <button class="hist-action-btn copy-btn" onclick="copyHistoryToClipboard()">
+            📋 Copy
+          </button>
+          <button class="hist-action-btn download-btn" onclick="downloadHistoryReport()">
+            💾 Download
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CSS STYLES FOR THE PREMIUM HISTORY COMPONENT -->
+  <style>
+    /* Badges styles */
+    .badge-agriculture {
+      background-color: rgba(16, 185, 129, 0.08);
+      color: #047857;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .badge-healthcare {
+      background-color: rgba(14, 165, 233, 0.08);
+      color: #0369a1;
+      border: 1px solid rgba(14, 165, 233, 0.2);
+    }
+
+    .badge-education {
+      background-color: rgba(99, 102, 241, 0.08);
+      color: #4338ca;
+      border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    /* Modal Overlay & Card styling */
+    .hist-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      animation: upiFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .hist-modal {
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.3);
+      border-radius: 1.75rem;
+      width: 760px;
+      max-width: 94%;
+      height: 600px;
+      max-height: 85vh;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      animation: upiSlideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .hist-modal-header {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      padding: 1.75rem 2.25rem 1.5rem 2.25rem;
+      color: white;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .hist-header-tokens {
+      font-size: 0.65rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(255, 255, 255, 0.7);
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 8px;
+      border-radius: 5px;
+    }
+
+    .hist-modal-title {
+      margin: 0.5rem 0 0 0;
+      font-size: 1.6rem;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+    }
+
+    .hist-modal-date {
+      margin: 0.25rem 0 0 0;
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.6);
+      font-weight: 600;
+    }
+
+    .hist-close-btn {
+      position: absolute;
+      top: 1.5rem;
+      right: 1.5rem;
+      background: rgba(255, 255, 255, 0.15);
+      border: none;
+      color: white;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      transition: all 0.2s ease;
+    }
+
+    .hist-close-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: scale(1.08);
+    }
+
+    /* Tabs styling */
+    .hist-tabs {
+      display: flex;
+      background: #f1f5f9;
+      border-bottom: 1px solid var(--line);
+      padding: 0 1.5rem;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    .hist-tab-btn {
+      background: transparent;
+      border: none;
+      border-bottom: 3.5px solid transparent;
+      padding: 1rem 1.25rem;
+      font-size: 0.88rem;
+      font-weight: 800;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .hist-tab-btn:hover {
+      color: var(--text);
+    }
+
+    .hist-tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    /* Modal Body & Panels */
+    .hist-modal-body {
+      flex-grow: 1;
+      overflow: hidden;
+      position: relative;
+      background: #fafbfc;
+      padding: 2rem 2.25rem;
+    }
+
+    .hist-tab-panel {
+      display: none;
+      height: 100%;
+    }
+
+    .hist-tab-panel.active {
+      display: block;
+    }
+
+    /* Loading state */
+    .hist-loading-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      background: #fafbfc;
+      z-index: 5;
+    }
+
+    .hist-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3.5px solid rgba(15, 118, 110, 0.1);
+      border-radius: 50%;
+      border-top-color: var(--primary);
+      animation: upiSpin 0.9s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+    }
+
+    /* Render Box for Outputs and Inputs */
+    .hist-report-render-box {
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 1rem;
+      padding: 1.5rem 1.75rem;
+      height: 100%;
+      overflow-y: auto;
+      font-size: 0.92rem;
+      line-height: 1.6;
+      color: #334155;
+    }
+    
+    .hist-report-render-box h1, .hist-report-render-box h2, .hist-report-render-box h3 {
+      color: #0f172a;
+      font-weight: 850;
+      letter-spacing: -0.02em;
+      margin-top: 1.25rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .hist-report-render-box h1 { font-size: 1.45rem; border-bottom: 1.5px solid #f1f5f9; padding-bottom: 0.4rem; }
+    .hist-report-render-box h2 { font-size: 1.25rem; }
+    .hist-report-render-box h3 { font-size: 1.1rem; }
+
+    .hist-report-render-box p {
+      margin-top: 0;
+      margin-bottom: 1rem;
+    }
+
+    .hist-report-render-box ul, .hist-report-render-box ol {
+      margin-top: 0;
+      margin-bottom: 1.25rem;
+      padding-left: 1.5rem;
+    }
+
+    .hist-report-render-box li {
+      margin-bottom: 0.45rem;
+    }
+
+    .hist-report-render-box table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1.5rem;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    .hist-report-render-box th {
+      background: #f8fafc;
+      font-weight: 800;
+      color: #1e293b;
+      padding: 0.6rem 0.8rem;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    .hist-report-render-box td {
+      padding: 0.6rem 0.8rem;
+      border-bottom: 1px solid #e2e8f0;
+      color: #475569;
+    }
+
+    .hist-report-render-box tr:hover td {
+      background: #f8fafc;
+    }
+
+    .hist-report-render-box code {
+      font-family: monospace;
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .hist-inputs-render-box {
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 1rem;
+      padding: 1.5rem 1.75rem;
+      height: 100%;
+      overflow-y: auto;
+    }
+
+    /* Modal Footer buttons */
+    .hist-modal-footer {
+      background: #f8fafc;
+      padding: 1.25rem 2.25rem;
+      border-top: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .hist-action-btn {
+      border: none;
+      cursor: pointer;
+      font-weight: 800;
+      border-radius: 0.75rem;
+      padding: 0.75rem 1.25rem;
+      font-size: 0.9rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .hist-action-btn:hover {
+      transform: translateY(-1.5px);
+    }
+
+    .hist-action-btn:active {
+      transform: translateY(0);
+    }
+
+    .hist-action-btn.copy-btn {
+      background: linear-gradient(135deg, #475569, #334155);
+      color: white;
+      box-shadow: 0 4px 10px rgba(51, 65, 85, 0.15);
+    }
+    
+    .hist-action-btn.copy-btn:hover {
+      box-shadow: 0 6px 14px rgba(51, 65, 85, 0.25);
+    }
+
+    .hist-action-btn.download-btn {
+      background: linear-gradient(135deg, var(--primary), #0d9488);
+      color: white;
+      box-shadow: 0 4px 12px rgba(15, 118, 110, 0.2);
+    }
+
+    .hist-action-btn.download-btn:hover {
+      box-shadow: 0 6px 16px rgba(15, 118, 110, 0.3);
+    }
+
+    .hist-action-btn.audio-btn {
+      background: #f1f5f9;
+      color: #1e293b;
+      border: 1px solid #cbd5e1;
+    }
+
+    .hist-action-btn.audio-btn.speaking {
+      background: #fee2e2;
+      color: #ef4444;
+      border-color: #fca5a5;
+      animation: voicePulse 1.8s ease-in-out infinite;
+    }
+
+    @keyframes voicePulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.65; }
+    }
+
+    /* Additional Animations */
+    @keyframes upiFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes upiSlideUp {
+      from { transform: translateY(40px) scale(0.96); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+
+    @keyframes upiSpin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+
+  <!-- JAVASCRIPT FOR DYNAMIC MODAL AND AUDIO SYNTHESIS -->
+  <script>
+    window.currentHistoryRawMarkdown = "";
+    window.currentHistoryToolTitle = "";
+    let synthUtterance = null;
+    let isSpeaking = false;
+
+    // Open Modal and Fetch API
+    async function openHistoryModal(outputId) {
+      const modal = document.getElementById("history-detail-modal");
+      const spinner = document.getElementById("history-loading-spinner");
+      const content = document.getElementById("history-modal-content");
+      
+      // Prevent scrolling on background body
+      document.body.style.overflow = "hidden";
+      
+      modal.style.display = "flex";
+      spinner.style.display = "flex";
+      content.style.display = "none";
+      
+      // Stop voice speech if active
+      stopSpeech();
+
+      try {
+        const response = await fetch(`/api/history/${outputId}`);
+        if (!response.ok) throw new Error("Could not load history item.");
+        const data = await response.json();
+        
+        // Populate Meta
+        document.getElementById("hist-modal-title").textContent = data.tool_title;
+        document.getElementById("hist-modal-date").textContent = data.pretty_date || new Date(data.created_at).toLocaleString();
+        document.getElementById("hist-modal-tokens").textContent = "⚡ " + data.tokens_used + " Tokens";
+        
+        const domainBadge = document.getElementById("hist-modal-domain");
+        domainBadge.className = `badge badge-${data.domain_id}`;
+        
+        let icon = "🎓";
+        if (data.domain_id === 'agriculture') icon = "🌾";
+        else if (data.domain_id === 'healthcare') icon = "🩺";
+        domainBadge.textContent = `${icon} ${data.domain_name}`;
+        
+        // Populate Inputs
+        const inputsContainer = document.getElementById("hist-inputs-container");
+        inputsContainer.innerHTML = "";
+        const promptFields = data.prompt || {};
+        if (Object.keys(promptFields).length === 0) {
+          inputsContainer.innerHTML = "<p class='muted' style='text-align:center; padding: 2rem 0;'>No inputs were submitted for this task.</p>";
+        } else {
+          const grid = document.createElement("div");
+          grid.style.display = "grid";
+          grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(240px, 1fr))";
+          grid.style.gap = "1rem";
+          
+          for (const [key, value] of Object.entries(promptFields)) {
+            if (!value) continue;
+            const box = document.createElement("div");
+            box.style.background = "#f8fafc";
+            box.style.padding = "0.75rem 1rem";
+            box.style.borderRadius = "0.75rem";
+            box.style.border = "1px solid var(--line)";
+            box.style.display = "flex";
+            box.style.flexDirection = "column";
+            box.style.gap = "4px";
+            
+            const label = document.createElement("div");
+            label.style.fontSize = "0.68rem";
+            label.style.fontWeight = "800";
+            label.style.color = "var(--muted)";
+            label.style.textTransform = "uppercase";
+            label.style.letterSpacing = "0.04em";
+            label.textContent = key.replace(/_/g, " ");
+            
+            const valText = document.createElement("div");
+            valText.style.fontSize = "0.88rem";
+            valText.style.fontWeight = "750";
+            valText.style.color = "var(--text)";
+            valText.style.lineHeight = "1.4";
+            valText.textContent = value;
+            
+            box.appendChild(label);
+            box.appendChild(valText);
+            grid.appendChild(box);
+          }
+          inputsContainer.appendChild(grid);
+        }
+        
+        // Populate Report
+        document.getElementById("hist-report-container").innerHTML = data.output_html;
+        
+        // Global variables assignment
+        window.currentHistoryRawMarkdown = data.output_markdown;
+        window.currentHistoryToolTitle = data.tool_title;
+        
+        switchHistoryTab("report");
+        
+        spinner.style.display = "none";
+        content.style.display = "block";
+      } catch (err) {
+        console.error(err);
+        alert("Failed to load historical output details. Please ensure Supabase sync is online.");
+        closeHistoryModal();
+      }
+    }
+
+    function closeHistoryModal() {
+      document.getElementById("history-detail-modal").style.display = "none";
+      document.body.style.overflow = "auto";
+      stopSpeech();
+    }
+
+    // Tab switcher
+    function switchHistoryTab(tabName) {
+      document.querySelectorAll(".hist-tab-btn").forEach(btn => btn.classList.remove("active"));
+      document.querySelectorAll(".hist-tab-panel").forEach(panel => panel.classList.remove("active"));
+      
+      document.getElementById(`hist-tab-${tabName}`).classList.add("active");
+      document.getElementById(`hist-tab-content-${tabName}`).classList.add("active");
+    }
+
+    // Copy to Clipboard
+    function copyHistoryToClipboard() {
+      const rawText = window.currentHistoryRawMarkdown;
+      if (!rawText) return;
+      
+      navigator.clipboard.writeText(rawText).then(() => {
+        const copyBtn = document.querySelector(".hist-action-btn.copy-btn");
+        const oldHtml = copyBtn.innerHTML;
+        copyBtn.innerHTML = "✓ Copied!";
+        copyBtn.style.background = "#10b981";
+        
+        setTimeout(() => {
+          copyBtn.innerHTML = oldHtml;
+          copyBtn.style.background = "";
+        }, 1800);
+      }).catch(err => {
+        console.error(err);
+        alert("Unable to copy to clipboard.");
+      });
+    }
+
+    // Download Markdown Document
+    function downloadHistoryReport() {
+      const rawText = window.currentHistoryRawMarkdown;
+      const title = window.currentHistoryToolTitle || "AgroMindReport";
+      if (!rawText) return;
+      
+      const blob = new Blob([rawText], { type: "text/markdown;charset=utf-8;" });
+      const link = document.createElement("a");
+      const filename = title.toLowerCase().replace(/[^a-z0-9]/g, "-") + "-report.md";
+      
+      if (navigator.msSaveBlob) { // IE 10+
+        navigator.msSaveBlob(blob, filename);
+      } else {
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    }
+
+    // Text to Speech Voice Synthesis
+    function toggleHistorySpeech() {
+      if (isSpeaking) {
+        stopSpeech();
+        return;
+      }
+
+      const reportDiv = document.getElementById("hist-report-container");
+      const textToSpeak = reportDiv.innerText || reportDiv.textContent;
+      if (!textToSpeak) return;
+
+      if (!('speechSynthesis' in window)) {
+        alert("Web Speech synthesis is not supported on this browser.");
+        return;
+      }
+
+      isSpeaking = true;
+      const speakBtn = document.getElementById("hist-speak-btn");
+      speakBtn.classList.add("speaking");
+      speakBtn.innerHTML = "⏹️ Stop Speech";
+
+      synthUtterance = new SpeechSynthesisUtterance(textToSpeak.slice(0, 8000));
+      
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        const preferred = voices.find(v => v.lang.includes("en-US") && v.name.includes("Google"));
+        if (preferred) synthUtterance.voice = preferred;
+      }
+      
+      synthUtterance.rate = 1.05;
+      
+      synthUtterance.onend = function() {
+        stopSpeech();
+      };
+      
+      synthUtterance.onerror = function() {
+        stopSpeech();
+      };
+
+      window.speechSynthesis.speak(synthUtterance);
+    }
+
+    function stopSpeech() {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      isSpeaking = false;
+      const speakBtn = document.getElementById("hist-speak-btn");
+      if (speakBtn) {
+        speakBtn.classList.remove("speaking");
+        speakBtn.innerHTML = "🔊 <span id='speak-btn-label'>Speak</span>";
+      }
+    }
+  </script>
+
   <!-- Toast Failure Alerts Container -->
   <div class="toast-container" id="toast-alerts-box"></div>
 
