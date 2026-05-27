@@ -767,7 +767,7 @@ def save_payment(
         "user_id": user_id,
         "plan": plan,
         "amount_paise": amount_paise,
-        "provider": "razorpay",
+        "provider": "upi" if provider_order_id.startswith("upipay-") else ("sandbox" if provider_order_id.startswith("sandbox-") else "razorpay"),
         "provider_order_id": provider_order_id,
         "provider_payment_id": provider_payment_id,
         "status": status,

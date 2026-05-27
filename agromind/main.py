@@ -56,8 +56,6 @@ load_dotenv()
 
 # Clean environment variables of spaces/quotes
 for env_key in [
-    "RAZORPAY_KEY_ID",
-    "RAZORPAY_KEY_SECRET",
     "NEXT_PUBLIC_SUPABASE_URL",
     "SUPABASE_URL",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
@@ -661,41 +659,21 @@ async def create_billing_order(request: Request, plan: str = Form(...), csrf_tok
     if plan_config["price_inr"] <= 0:
         raise HTTPException(status_code=400, detail="This plan does not require payment.")
 
-    key_id = os.getenv("RAZORPAY_KEY_ID")
-    key_secret = os.getenv("RAZORPAY_KEY_SECRET")
-    if not key_id or not key_secret:
-        raise HTTPException(status_code=503, detail="Razorpay keys are not configured.")
-
+    merchant_upi = os.getenv("MERCHANT_UPI_ID", "surya@okaxis")
+    merchant_name = os.getenv("MERCHANT_NAME", "AgroMind AI")
     amount = int(plan_config["price_inr"] * 100)
-    payload = {
-        "amount": amount,
-        "currency": "INR",
-        "receipt": f"agromind-{user_or_response.get('id')}-{plan}",
-        "notes": {"user_id": user_or_response.get("id"), "plan": plan},
-    }
-    auth = base64.b64encode(f"{key_id}:{key_secret}".encode("utf-8")).decode("ascii")
-    try:
-        import httpx
-
-        response = httpx.post(
-            "https://api.razorpay.com/v1/orders",
-            headers={"Authorization": f"Basic {auth}", "Content-Type": "application/json"},
-            json=payload,
-            timeout=20,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Could not reach Razorpay: {exc}") from exc
-    if response.status_code >= 400:
-        raise HTTPException(status_code=502, detail="Razorpay order creation failed.")
-
-    order = response.json()
-    save_payment(user_or_response.get("id"), plan, amount, order.get("id", ""), status="created")
+    
+    order_id = f"upipay-{secrets.token_hex(4)}"
+    
+    save_payment(user_or_response.get("id"), plan, amount, order_id, status="created")
     return {
-        "key_id": key_id,
-        "order_id": order.get("id"),
+        "key_id": "upi",
+        "order_id": order_id,
         "amount": amount,
         "currency": "INR",
         "plan_name": plan_config["name"],
+        "upi_id": merchant_upi,
+        "merchant_name": merchant_name,
     }
 
 
@@ -706,20 +684,22 @@ async def verify_billing_payment(
     csrf_token: str = Form(...),
     razorpay_order_id: str = Form(...),
     razorpay_payment_id: str = Form(...),
-    razorpay_signature: str = Form(...),
+    razorpay_signature: str = Form(""),
 ):
     user_or_response = require_user(request)
     if isinstance(user_or_response, RedirectResponse):
         raise HTTPException(status_code=401, detail="Login required.")
     verify_csrf(request, csrf_token)
 
-    secret = os.getenv("RAZORPAY_KEY_SECRET")
-    if not secret:
-        raise HTTPException(status_code=503, detail="Razorpay secret is not configured.")
-    body = f"{razorpay_order_id}|{razorpay_payment_id}".encode("utf-8")
-    expected = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(expected, razorpay_signature):
-        raise HTTPException(status_code=400, detail="Invalid Razorpay payment signature.")
+    if not razorpay_order_id.startswith("upipay-"):
+        raise HTTPException(status_code=400, detail="Invalid UPI transaction order.")
+
+    utr = (razorpay_payment_id or "").strip()
+    if len(utr) != 12 or not utr.isdigit():
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid UPI Ref No (UTR)! Must be exactly a 12-digit numeric code."
+        )
 
     plan_config = get_plan(plan)
     update_profile_plan(user_or_response.get("id"), plan, user_or_response.get("access_token"))
@@ -729,7 +709,7 @@ async def verify_billing_payment(
         plan,
         int(plan_config["price_inr"] * 100),
         razorpay_order_id,
-        razorpay_payment_id,
+        utr,
         "paid",
     )
     return {"ok": True, "plan": plan}
