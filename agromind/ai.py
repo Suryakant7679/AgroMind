@@ -250,19 +250,34 @@ def infer_groq_task(tool_id: str, fields: dict[str, str], language_code: str, ha
 def extract_youtube_video_id(url: str) -> str | None:
     if not url:
         return None
-    patterns = [
-        r'(?:v=|\/v\/|embed\/|shorts\/|youtu\.be\/|\/embed\/|\/v\/|\/watch\?v=|\/watch\?.+&v=)([^#\&\?]{11})',
-        r'(?:youtube\.com\/watch\?v=)([^#\&\?]{11})',
-        r'(?:youtu\.be\/)([^#\&\?]{11})'
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, url)
-        if match:
-            return match.group(1)
-    if "youtube.com" in url or "youtu.be" in url:
-        match = re.search(r'\/([^#\&\?]{11})', url)
-        if match:
-            return match.group(1)
+    url = url.strip()
+    
+    # 1. Parse standard watch?v=ID or other query params like &v=ID
+    query_match = re.search(r'(?:[?&]v=)([a-zA-Z0-9_-]{11})', url)
+    if query_match:
+        return query_match.group(1)
+        
+    # 2. Parse paths like /embed/ID, /v/ID, /shorts/ID, /live/ID
+    path_match = re.search(r'(?:embed|v|shorts|live)\/([a-zA-Z0-9_-]{11})', url)
+    if path_match:
+        return path_match.group(1)
+        
+    # 3. Parse youtu.be/ID
+    short_match = re.search(r'youtu\.be\/([a-zA-Z0-9_-]{11})', url)
+    if short_match:
+        return short_match.group(1)
+        
+    # 4. General fallback: if it's already just the 11-character ID
+    if re.match(r'^[a-zA-Z0-9_-]{11}$', url):
+        return url
+        
+    # 5. Last resort fallback (avoiding 'watch', 'shorts', etc.)
+    last_resort = re.search(r'\/([a-zA-Z0-9_-]{11})(?:[?&]|$)', url)
+    if last_resort:
+        candidate = last_resort.group(1)
+        if candidate.lower() not in {"watch", "embed", "shorts", "live"}:
+            return candidate
+            
     return None
 
 

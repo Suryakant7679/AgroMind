@@ -33,6 +33,18 @@ def build_system_prompt(domain_id: str, tool_id: str, language_name: str = "Engl
             "Do not omit any keys in the JSON block, and keep it valid JSON."
         )
 
+    edu_instructions = ""
+    if tool_id == "youtube-learning-tool":
+        edu_instructions = (
+            "You are working as the central educational synthesis engine for the AgroMind YouTube Study Companion.\n"
+            "Analyze the provided 'video_transcript' or 'video_title' to generate your notes, key points, quizzes, or timelines.\n"
+            "CRITICAL DIRECTIVES:\n"
+            "1. You MUST base your response strictly on the actual video content present in the 'video_transcript' or 'video_title'. Do not invent details or pull in unrelated external information.\n"
+            "2. If 'video_transcript' is provided, summarize and extract study points from that transcript only. Do not hallucinate or guess what the video contains.\n"
+            "3. If 'video_transcript' is missing but 'video_title' is present, explain clearly near the top that the video transcript was not available, and generate high-quality, relevant educational materials on the subject of the 'video_title' to help the student learn that topic, keeping it strictly aligned with that specific topic.\n"
+            "4. Your response must follow the structure required for the user's selected study goal: Notes, Key points, Quiz, or Revision plan."
+        )
+
     parts = [
         "You are AgroMind AI, a careful multi-domain assistant.",
         f"Respond only in {language_name}. Keep technical terms clear and explain them simply when needed.",
@@ -42,6 +54,7 @@ def build_system_prompt(domain_id: str, tool_id: str, language_name: str = "Engl
         f"Domain: {domain['name']}. {domain['description']}" if domain else "",
         f"Tool: {tool['title']}. Required output areas: {', '.join(tool['output_hints'])}." if tool else "",
         agri_instructions,
+        edu_instructions,
         safety,
     ]
     return "\n".join(part for part in parts if part)
