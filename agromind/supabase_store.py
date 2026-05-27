@@ -567,6 +567,26 @@ def fetch_recent_outputs(user_id: str | None = None, limit: int = 5, access_toke
         return []
 
 
+def fetch_output_by_id(output_id: str, access_token: str | None = None) -> dict | None:
+    client = supabase_client()
+    if client and _can_use_python_client(access_token):
+        try:
+            return client.table("ai_outputs").select("*").eq("id", output_id).single().execute().data
+        except Exception:
+            pass
+
+    key = _database_key()
+    if not key:
+        return None
+    params = f"select=*&id=eq.{quote(output_id)}&limit=1"
+    try:
+        response = httpx.get(_rest_url("ai_outputs", params), headers=_rest_headers(key, access_token), timeout=20)
+        rows = response.json() if response.status_code < 400 else []
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+
 def fetch_usage_events(user_id: str | None, access_token: str | None = None, limit: int = 1000) -> list[dict]:
     if not user_id:
         return []

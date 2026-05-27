@@ -35,6 +35,8 @@ from agromind.supabase_store import (
     fetch_profile,
     fetch_profiles,
     fetch_recent_outputs,
+    fetch_output_by_id,
+    _parse_time,
     insert_profile_if_missing,
     save_payment,
     save_output,
@@ -152,10 +154,35 @@ def dashboard(request: Request):
     if isinstance(user_or_response, RedirectResponse):
         return user_or_response
     recent = fetch_recent_outputs(user_or_response.get("id"), access_token=user_or_response.get("access_token"))
+    
+    enriched_recent = []
+    for item in recent:
+        domain_id = item.get("domain")
+        tool_id = item.get("tool")
+        domain = get_domain(domain_id)
+        tool = get_tool(domain_id, tool_id)
+        
+        raw_date = item.get("created_at")
+        pretty_date = "Recent"
+        if raw_date:
+            parsed = _parse_time(raw_date)
+            if parsed:
+                pretty_date = parsed.strftime("%b %d, %Y - %I:%M %p")
+        
+        enriched_recent.append({
+            "id": item.get("id"),
+            "domain_id": domain_id,
+            "tool_id": tool_id,
+            "domain_name": domain["name"] if domain else domain_id.replace("-", " ").capitalize(),
+            "tool_title": tool["title"] if tool else tool_id.replace("-", " ").capitalize(),
+            "pretty_date": pretty_date,
+            "tokens_used": item.get("tokens_used", 0)
+        })
+        
     profile_data = fetch_profile(user_or_response.get("id"), user_or_response.get("access_token")) or {}
     plan = get_plan(profile_data.get("plan", "starter"))
     usage = usage_summary(user_or_response.get("id"), user_or_response.get("access_token"))
-    return page(request, "dashboard.html", tools=all_tools(), recent=recent, usage=usage, current_plan=plan)
+    return page(request, "dashboard.html", tools=all_tools(), recent=enriched_recent, usage=usage, current_plan=plan)
 
 
 @app.get("/dashboard/{domain_id}", response_class=HTMLResponse)
@@ -952,6 +979,46 @@ async def text_to_speech(
         return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/wav", headers={"X-AgroMind-Model": model})
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Groq text-to-speech failed: {exc}") from exc
+
+
+@app.get("/api/history/{output_id}")
+async def get_history_detail(request: Request, output_id: str):
+    user_or_response = require_user(request)
+    if isinstance(user_or_response, RedirectResponse):
+        raise HTTPException(status_code=401, detail="Login required.")
+    
+    output = fetch_output_by_id(output_id, user_or_response.get("access_token"))
+    if not output:
+        raise HTTPException(status_code=404, detail="Output not found.")
+    
+    # Check that this output belongs to the authenticated user
+    if output.get("user_id") and str(output.get("user_id")) != str(user_or_response.get("id")):
+        raise HTTPException(status_code=403, detail="Access denied.")
+    
+    # Resolve tool title and domain title
+    tool_id = output.get("tool")
+    domain_id = output.get("domain")
+    domain = get_domain(domain_id)
+    tool = get_tool(domain_id, tool_id)
+    
+    tool_title = tool["title"] if tool else tool_id.replace("-", " ").capitalize()
+    domain_name = domain["name"] if domain else domain_id.replace("-", " ").capitalize()
+    
+    # Render markdown to HTML
+    output_html = markdown.markdown(output.get("output_markdown", ""), extensions=["tables", "fenced_code"])
+    
+    return {
+        "id": output.get("id"),
+        "tool_id": tool_id,
+        "domain_id": domain_id,
+        "tool_title": tool_title,
+        "domain_name": domain_name,
+        "prompt": output.get("prompt", {}),
+        "output_markdown": output.get("output_markdown", ""),
+        "output_html": output_html,
+        "tokens_used": output.get("tokens_used", 0),
+        "created_at": output.get("created_at"),
+    }
 
 
 @app.post("/api/export/report")
