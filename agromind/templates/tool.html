@@ -59,7 +59,7 @@
         background: white !important;
         color: black !important;
       }
-      .sidebar, .topbar, .sidebar-overlay, .voice-assistant-container, form, .tts-speak-btn, #dashboard-tabs {
+      .sidebar, .topbar, .sidebar-overlay, .voice-assistant-container, form, .tts-speak-btn, #dashboard-tabs, .form-panel-card, .output-header {
         display: none !important;
       }
       .layout {
@@ -73,6 +73,10 @@
         box-shadow: none !important;
         background: transparent !important;
         padding: 0 !important;
+      }
+      .output-panel-card {
+        padding: 0 !important;
+        margin: 0 !important;
       }
       #tab-report, #tab-dashboard {
         display: block !important;
@@ -91,7 +95,7 @@
   </style>
 
   <div class="grid grid-2">
-    <section class="card">
+    <section class="card form-panel-card">
       <span class="badge">{{ domain.name }}</span>
       <h1>{{ tool.title }}</h1>
       <p class="muted">{{ tool.description }}</p>
@@ -164,14 +168,21 @@
       </form>
     </section>
     
-    <section class="card">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+    <section class="card output-panel-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;" class="output-header">
         <h2 style="margin: 0;" data-i18n="tool.aiOutput">AI Output</h2>
-        {% if output_html %}
-          <button type="button" class="tts-speak-btn" onclick="speakText(document.getElementById('ai-output-text').innerText, this, null, '{{ response_language or default_language }}')">
-            <span class="speaker-icon">🔊</span> <span class="btn-label" data-i18n="tool.listen">Listen</span>
-          </button>
-        {% endif %}
+        <div style="display: flex; gap: 8px; align-items: center;">
+          {% if output_html and tool.id == "ppt-generator" %}
+            <button type="button" class="button secondary" onclick="exportPPT()" style="padding: 4px 12px; font-size: 0.82rem; font-weight: 700; margin: 0; height: auto; display: flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 6px;">
+              <span>📊</span> <span data-i18n="tool.exportPpt">Export PPT</span>
+            </button>
+          {% endif %}
+          {% if output_html %}
+            <button type="button" class="tts-speak-btn" onclick="speakText(document.getElementById('ai-output-text').innerText, this, null, '{{ response_language or default_language }}')">
+              <span class="speaker-icon">🔊</span> <span class="btn-label" data-i18n="tool.listen">Listen</span>
+            </button>
+          {% endif %}
+        </div>
       </div>
 
       <!-- High-End Dashboard Tabs for Agricultural Reports -->
@@ -546,6 +557,98 @@
 
         </div>
       `;
+    }
+
+    // Rich PPT Presentation Exporter
+    function getRichSlideData() {
+      const outputEl = document.getElementById('ai-output-text');
+      if (!outputEl) return [];
+      
+      const slides = [];
+      let currentSlide = null;
+      const children = Array.from(outputEl.children);
+      
+      children.forEach(child => {
+        const tagName = child.tagName.toLowerCase();
+        if (['h1', 'h2', 'h3', 'h4'].includes(tagName)) {
+          currentSlide = {
+            title: child.innerText.trim(),
+            content: []
+          };
+          slides.push(currentSlide);
+        } else if (['ul', 'ol'].includes(tagName) && currentSlide) {
+          const items = Array.from(child.querySelectorAll('li')).map(li => li.innerText.trim());
+          currentSlide.content.push(...items);
+        } else if (tagName === 'p' && currentSlide) {
+          const paragraphText = child.innerText.trim();
+          if (paragraphText) {
+            currentSlide.content.push(paragraphText);
+          }
+        }
+      });
+      
+      if (slides.length === 0) {
+        const text = outputEl.innerText || outputEl.textContent;
+        const lines = text.split('\n');
+        let fallbackSlide = null;
+        for (let line of lines) {
+          line = line.trim();
+          if (!line) continue;
+          if (/^(?:Slide\s*\d+[:\-]?|###?\s*Slide\s*\d+|#+\s*Slide)/i.test(line) || line.startsWith('###') || line.startsWith('##')) {
+            fallbackSlide = {
+              title: line.replace(/^#+\s*/, ''),
+              content: []
+            };
+            slides.push(fallbackSlide);
+          } else if (fallbackSlide) {
+            const cleanedLine = line.replace(/^[\-\*\+\s\d+\.]+\s*/, '');
+            fallbackSlide.content.push(cleanedLine);
+          }
+        }
+      }
+      
+      if (slides.length === 0) {
+        const text = outputEl.innerText || outputEl.textContent;
+        const bulletLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0).slice(0, 10);
+        slides.push({
+          title: "Presentation Overview",
+          content: bulletLines
+        });
+      }
+      return slides;
+    }
+
+    function exportPPT() {
+      const topicEl = document.getElementById("topic");
+      const title = topicEl ? topicEl.value.trim() : "AgroMind AI Presentation";
+      const slidesData = getRichSlideData();
+      const slidesString = JSON.stringify(slidesData);
+      
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/api/ppt';
+      
+      const csrfInput = document.createElement('input');
+      csrfInput.type = 'hidden';
+      csrfInput.name = 'csrf_token';
+      csrfInput.value = '{{ csrf_token }}';
+      form.appendChild(csrfInput);
+      
+      const titleInput = document.createElement('input');
+      titleInput.type = 'hidden';
+      titleInput.name = 'title';
+      titleInput.value = title;
+      form.appendChild(titleInput);
+      
+      const slidesInput = document.createElement('input');
+      slidesInput.type = 'hidden';
+      slidesInput.name = 'slides';
+      slidesInput.value = slidesString;
+      form.appendChild(slidesInput);
+      
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
     }
 
     // Initialization & Form binding on load

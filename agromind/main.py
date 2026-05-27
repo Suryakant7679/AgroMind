@@ -1111,6 +1111,7 @@ async def create_ppt(
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.5)
 
+    # Title slide
     title_slide = prs.slides.add_slide(prs.slide_layouts[6])
     box = title_slide.shapes.add_textbox(Inches(0.7), Inches(2.4), Inches(12), Inches(0.8))
     run = box.text_frame.paragraphs[0].add_run()
@@ -1118,13 +1119,47 @@ async def create_ppt(
     run.font.size = Pt(34)
     run.font.bold = True
 
-    slide_items = [item.strip() for item in slides.splitlines() if item.strip()] or ["Overview", "Key concepts", "Examples", "Summary"]
-    for index, item in enumerate(slide_items, start=1):
+    # Parse slide structures dynamically
+    import json
+    slide_data = []
+    try:
+        slide_data = json.loads(slides)
+    except Exception:
+        # Fallback to plain text splitting by newline
+        slide_items = [item.strip() for item in slides.splitlines() if item.strip()] or ["Overview", "Key concepts", "Examples", "Summary"]
+        for index, item in enumerate(slide_items, start=1):
+            slide_data.append({
+                "title": f"{index}. {item}",
+                "content": ["Use this slide for key points, examples, and supporting notes from the selected topic."]
+            })
+
+    for item in slide_data:
         slide = prs.slides.add_slide(prs.slide_layouts[6])
-        heading = slide.shapes.add_textbox(Inches(0.7), Inches(0.6), Inches(11.5), Inches(0.5))
-        heading.text_frame.text = f"{index}. {item}"
-        body = slide.shapes.add_textbox(Inches(0.7), Inches(1.5), Inches(11), Inches(1.2))
-        body.text_frame.text = "Use this slide for key points, examples, and supporting notes from the selected topic."
+        
+        # Add heading
+        heading = slide.shapes.add_textbox(Inches(0.7), Inches(0.6), Inches(11.5), Inches(0.8))
+        tf_heading = heading.text_frame
+        tf_heading.word_wrap = True
+        p_head = tf_heading.paragraphs[0]
+        p_head.text = item.get("title", "Untitled Slide")
+        p_head.font.size = Pt(28)
+        p_head.font.bold = True
+        
+        # Add body content
+        body = slide.shapes.add_textbox(Inches(0.7), Inches(1.6), Inches(11.5), Inches(4.8))
+        tf_body = body.text_frame
+        tf_body.word_wrap = True
+        
+        bullets = item.get("content", [])
+        if isinstance(bullets, str):
+            bullets = [bullets]
+            
+        for idx, bullet in enumerate(bullets):
+            p = tf_body.paragraphs[0] if idx == 0 else tf_body.add_paragraph()
+            p.text = bullet
+            p.level = 0
+            p.space_after = Pt(12)
+            p.font.size = Pt(18)
 
     output = io.BytesIO()
     prs.save(output)
