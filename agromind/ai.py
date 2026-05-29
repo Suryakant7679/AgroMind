@@ -174,6 +174,7 @@ async def summarize_file(file: UploadFile | None) -> tuple[str | None, str | Non
     if not file or not file.filename:
         return None, None, None
     content = await file.read()
+    await file.seek(0)  # Reset pointer as a best practice
     if not content:
         return None, None, None
     size_kb = round(len(content) / 1024)

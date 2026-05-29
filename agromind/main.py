@@ -80,6 +80,11 @@ app.add_middleware(SessionMiddleware, secret_key=session_secret, https_only=os.g
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
+# Configure and ensure secure upload directory exists
+UPLOADS_DIR = BASE_DIR / "static" / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+
 
 def user_from_session(request: Request) -> dict | None:
     return request.session.get("user")
@@ -246,6 +251,76 @@ async def run_tool(
     fields = {field["name"]: str(form.get(field["name"], "")) for field in tool["fields"]}
     language_code = str(form.get("__language", DEFAULT_LANGUAGE))
     uploaded_asset = asset_camera if asset_camera and asset_camera.filename else asset
+    
+    # Secure validation & saving of uploaded file
+    if uploaded_asset and uploaded_asset.filename:
+        try:
+            # 1. Size Validation (Max 10MB)
+            MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+            content = await uploaded_asset.read()
+            file_size = len(content)
+            await uploaded_asset.seek(0)  # Always seek back after read!
+            
+            if file_size > MAX_FILE_SIZE:
+                raise ValueError("File is too large. Maximum size allowed is 10MB.")
+                
+            # 2. Type Validation
+            content_type = uploaded_asset.content_type
+            filename_lower = uploaded_asset.filename.lower()
+            allowed_mimes = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"]
+            allowed_extensions = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf")
+            
+            is_valid_type = (content_type in allowed_mimes) or filename_lower.endswith(allowed_extensions)
+            if not is_valid_type:
+                raise ValueError("Invalid file type. Only standard images (JPG, PNG, GIF, WEBP) and PDF files are allowed.")
+                
+            # 3. Secure File Saving
+            file_ext = os.path.splitext(uploaded_asset.filename)[1]
+            if not file_ext and content_type:
+                if "pdf" in content_type:
+                    file_ext = ".pdf"
+                elif "png" in content_type:
+                    file_ext = ".png"
+                elif "gif" in content_type:
+                    file_ext = ".gif"
+                elif "webp" in content_type:
+                    file_ext = ".webp"
+                else:
+                    file_ext = ".jpg"
+            
+            unique_filename = f"{secrets.token_hex(8)}{file_ext}"
+            saved_path = UPLOADS_DIR / unique_filename
+            
+            with open(saved_path, "wb") as f:
+                f.write(content)
+                
+            # Reset file pointer again so downstream processes can read it fully
+            await uploaded_asset.seek(0)
+            print(f"[UPLOAD SUCCESS] {uploaded_asset.filename} -> {unique_filename} ({file_size} bytes)")
+            
+        except ValueError as exc:
+            return page(
+                request,
+                "tool.html",
+                domain=domain,
+                tool=tool,
+                output_html=None,
+                fields=fields,
+                error=str(exc),
+                response_language=language_code,
+            )
+        except Exception as exc:
+            return page(
+                request,
+                "tool.html",
+                domain=domain,
+                tool=tool,
+                output_html=None,
+                fields=fields,
+                error=f"File saving failed: {str(exc)}",
+                response_language=language_code,
+            )
+
     try:
         input_tokens = estimate_prompt_tokens(fields)
         output, provider, response_language = await generate_ai_response(domain_id, tool_id, fields, uploaded_asset, language_code, plan_id)

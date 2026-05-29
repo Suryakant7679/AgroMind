@@ -92,6 +92,192 @@
         background: #fdfdfd !important;
       }
     }
+
+    /* --- PREMIUM WEBCAM CAPTURE MODAL STYLES --- */
+    .webcam-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      opacity: 0;
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .webcam-modal.open {
+      display: flex;
+      opacity: 1;
+    }
+    .webcam-content {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 1.25rem;
+      width: 92%;
+      max-width: 580px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      box-shadow: 0 25px 50px -12px rgba(15, 118, 110, 0.25);
+      animation: webcamScaleUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes webcamScaleUp {
+      from { transform: scale(0.92); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .webcam-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 0.75rem;
+    }
+    .webcam-header h3 {
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+    .webcam-video-container {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4/3;
+      background: #0f172a;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+    }
+    .webcam-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .webcam-captured-canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+    .webcam-controls {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: flex-end;
+      border-top: 1px solid var(--line);
+      padding-top: 0.75rem;
+    }
+    .recording-indicator {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 0.4rem 0.8rem;
+      border-radius: 9999px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    .recording-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ef4444;
+      animation: webcamBlink 1s infinite alternate;
+    }
+    @keyframes webcamBlink {
+      from { opacity: 0.3; }
+      to { opacity: 1; }
+    }
+
+    /* --- VISUAL UPLOAD PREVIEW CARD --- */
+    .upload-preview-container {
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: 0.75rem;
+      padding: 0.85rem;
+      background: #f8fafc;
+      margin-top: 0.85rem;
+      align-items: center;
+      gap: 1rem;
+      position: relative;
+      animation: webcamFadeIn 0.25s ease;
+    }
+    @keyframes webcamFadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .preview-thumbnail-container {
+      width: 4.5rem;
+      height: 4.5rem;
+      border-radius: 0.5rem;
+      border: 1px solid var(--line);
+      overflow: hidden;
+      flex-shrink: 0;
+      background: white;
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+    .preview-thumbnail {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .preview-pdf-icon {
+      font-size: 2.2rem;
+      color: #ef4444;
+      line-height: 1;
+    }
+    .preview-details {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      flex-grow: 1;
+      min-width: 0;
+    }
+    .preview-name {
+      font-size: 0.88rem;
+      font-weight: 750;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .preview-size {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .preview-remove-btn {
+      background: rgba(239, 68, 68, 0.08);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.78rem;
+      font-weight: 750;
+      cursor: pointer;
+      transition: all 0.2s;
+      height: auto;
+      margin: 0;
+    }
+    .preview-remove-btn:hover {
+      background: #ef4444;
+      color: white;
+      border-color: #ef4444;
+    }
   </style>
 
   <div class="grid grid-2">
@@ -159,6 +345,20 @@
                 <input id="asset-camera" name="asset_camera" type="file" accept="image/*" capture="environment">
               </label>
             </div>
+            
+            <!-- visual upload preview card -->
+            <div class="upload-preview-container" id="upload-preview-container">
+              <div class="preview-thumbnail-container">
+                <img id="preview-image" class="preview-thumbnail" style="display: none;" alt="Preview image">
+                <span id="preview-pdf-icon" class="preview-pdf-icon" style="display: none;">📄</span>
+              </div>
+              <div class="preview-details">
+                <span class="preview-name" id="preview-filename">filename.jpg</span>
+                <span class="preview-size" id="preview-filesize">0 KB</span>
+              </div>
+              <button type="button" class="preview-remove-btn" onclick="clearSelectedFile()">Remove</button>
+            </div>
+
             <p class="field-note" data-i18n="tool.uploadNote">Upload or capture plant leaves, skin photos, report images, or readable PDFs/images when the tool needs visual context.</p>
           </div>
         {% endif %}
@@ -682,5 +882,266 @@
         }
       }
     });
+
+    // --- CUSTOM WEBCAM & IMAGE UPLOAD HANDLING ---
+    // Device check helper
+    function isMobileDevice() {
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    let webcamStream = null;
+    const fileInput = document.getElementById("asset");
+    const cameraInput = document.getElementById("asset-camera");
+    const previewContainer = document.getElementById("upload-preview-container");
+    const previewImage = document.getElementById("preview-image");
+    const previewPdfIcon = document.getElementById("preview-pdf-icon");
+    const previewFilename = document.getElementById("preview-filename");
+    const previewFilesize = document.getElementById("preview-filesize");
+
+    // Intercept "Use Camera" label click on desktop browser
+    document.addEventListener("DOMContentLoaded", () => {
+      if (cameraInput) {
+        const cameraLabel = cameraInput.closest(".file-action");
+        if (cameraLabel) {
+          // Listen to clicks on the parent label to intercept
+          cameraLabel.addEventListener("click", (e) => {
+            if (!isMobileDevice()) {
+              e.preventDefault(); // Stop default file explorer trigger
+              openWebcamModal();
+            }
+          });
+        }
+        
+        // Listen for native file selections (for mobile or standard picker)
+        cameraInput.addEventListener("change", (e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            // Standard choose file was cleared when camera input was populated
+            if (fileInput) fileInput.value = "";
+            handleFileSelection(e.target.files[0]);
+          }
+        });
+      }
+      
+      if (fileInput) {
+        fileInput.addEventListener("change", (e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            // Camera input was cleared when standard file was selected
+            if (cameraInput) cameraInput.value = "";
+            handleFileSelection(e.target.files[0]);
+          }
+        });
+      }
+    });
+
+    // File Preview Handler
+    function handleFileSelection(file) {
+      if (!file) {
+        clearSelectedFile();
+        return;
+      }
+      
+      // Update info
+      previewFilename.textContent = file.name;
+      const sizeKB = Math.round(file.size / 1024);
+      previewFilesize.textContent = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(2)} MB` : `${sizeKB} KB`;
+      
+      // Check type
+      if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          previewImage.src = e.target.result;
+          previewImage.style.display = "block";
+          previewPdfIcon.style.display = "none";
+        };
+        reader.readAsDataURL(file);
+      } else if (file.type === "application/pdf") {
+        previewImage.style.display = "none";
+        previewPdfIcon.style.display = "block";
+        previewPdfIcon.textContent = "📄";
+      } else {
+        // Fallback for general files
+        previewImage.style.display = "none";
+        previewPdfIcon.style.display = "block";
+        previewPdfIcon.textContent = "📁";
+      }
+      
+      previewContainer.style.display = "flex";
+    }
+
+    // Clear file staging and preview
+    function clearSelectedFile() {
+      if (fileInput) fileInput.value = "";
+      if (cameraInput) cameraInput.value = "";
+      if (previewContainer) previewContainer.style.display = "none";
+      if (previewImage) {
+        previewImage.src = "";
+        previewImage.style.display = "none";
+      }
+      if (previewPdfIcon) {
+        previewPdfIcon.style.display = "none";
+        previewPdfIcon.textContent = "📄";
+      }
+    }
+
+    // Webcam Modal Operations
+    function openWebcamModal() {
+      const modal = document.getElementById("webcam-modal");
+      if (modal) {
+        modal.classList.add("open");
+        startWebcamStream();
+      }
+    }
+
+    function closeWebcamModal() {
+      const modal = document.getElementById("webcam-modal");
+      if (modal) {
+        modal.classList.remove("open");
+      }
+      stopWebcamStream();
+    }
+
+    async function startWebcamStream() {
+      const video = document.getElementById("webcam-video");
+      const canvas = document.getElementById("webcam-canvas");
+      const btnCapture = document.getElementById("webcam-btn-capture");
+      const btnUse = document.getElementById("webcam-btn-use");
+      const btnRetake = document.getElementById("webcam-btn-retake");
+      const indicator = document.getElementById("webcam-indicator");
+      const indicatorText = document.getElementById("webcam-indicator-text");
+
+      // Reset DOM state inside modal
+      if (video) video.style.display = "block";
+      if (canvas) canvas.style.display = "none";
+      if (btnCapture) btnCapture.style.display = "inline-flex";
+      if (btnUse) btnUse.style.display = "none";
+      if (btnRetake) btnRetake.style.display = "none";
+      if (indicatorText) indicatorText.textContent = "LIVE";
+      if (indicator) {
+        indicator.style.background = "rgba(0,0,0,0.6)";
+        indicator.querySelector(".recording-dot").style.background = "#ef4444";
+      }
+
+      stopWebcamStream(); // Ensure any existing stream is closed
+
+      try {
+        webcamStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        if (video) {
+          video.srcObject = webcamStream;
+        }
+      } catch (err) {
+        console.error("Webcam stream launch failed", err);
+        alert("Unable to open your camera. Please ensure camera permissions are allowed or select a file instead.");
+        closeWebcamModal();
+      }
+    }
+
+    function stopWebcamStream() {
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(track => track.stop());
+        webcamStream = null;
+      }
+      const video = document.getElementById("webcam-video");
+      if (video) {
+        video.srcObject = null;
+      }
+    }
+
+    function captureSnapshot() {
+      const video = document.getElementById("webcam-video");
+      const canvas = document.getElementById("webcam-canvas");
+      const btnCapture = document.getElementById("webcam-btn-capture");
+      const btnUse = document.getElementById("webcam-btn-use");
+      const btnRetake = document.getElementById("webcam-btn-retake");
+      const indicatorText = document.getElementById("webcam-indicator-text");
+      const indicator = document.getElementById("webcam-indicator");
+
+      if (!video || !canvas) return;
+
+      const context = canvas.getContext("2d");
+      // Match canvas sizes with video actual dimensions
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+
+      // Draw active frame onto canvas
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Stop stream to freeze and conserve hardware
+      stopWebcamStream();
+
+      // UI Swapping inside modal
+      video.style.display = "none";
+      canvas.style.display = "block";
+      if (btnCapture) btnCapture.style.display = "none";
+      if (btnUse) btnUse.style.display = "inline-flex";
+      if (btnRetake) btnRetake.style.display = "inline-flex";
+      if (indicatorText) indicatorText.textContent = "FREEZE";
+      if (indicator) {
+        indicator.style.background = "rgba(16, 185, 129, 0.9)";
+        indicator.querySelector(".recording-dot").style.background = "white";
+      }
+    }
+
+    function useCapturedSnapshot() {
+      const canvas = document.getElementById("webcam-canvas");
+      if (!canvas) return;
+
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+
+        // Stage file in camera input element using DataTransfer API
+        const file = new File([blob], "webcam_snapshot.jpg", { type: "image/jpeg", lastModified: Date.now() });
+        
+        try {
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          cameraInput.files = dt.files;
+          
+          // Clear standard choose file input
+          if (fileInput) fileInput.value = "";
+          
+          // Trigger visual preview updating
+          handleFileSelection(file);
+        } catch (e) {
+          console.error("DataTransfer mapping failed", e);
+          // Fallback if DataTransfer fails (highly unlikely on modern browsers)
+          alert("Staging webcam photo failed. Please select an image file directly.");
+        }
+        
+        closeWebcamModal();
+      }, "image/jpeg", 0.92);
+    }
   </script>
+
+  <!-- Premium Glassmorphic Webcam Capture Modal for Desktop Devices -->
+  <div class="webcam-modal" id="webcam-modal">
+    <div class="webcam-content">
+      <div class="webcam-header">
+        <h3 data-i18n="tool.webcamTitle">Webcam Snapshot Capture</h3>
+        <button type="button" onclick="closeWebcamModal()" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--muted); line-height:1;">&times;</button>
+      </div>
+      
+      <div class="webcam-video-container">
+        <!-- Live Video stream -->
+        <video class="webcam-video" id="webcam-video" autoplay playsinline></video>
+        <!-- Canvas to render the captured snapshot -->
+        <canvas class="webcam-captured-canvas" id="webcam-canvas"></canvas>
+        
+        <!-- Live status indicator -->
+        <div class="recording-indicator" id="webcam-indicator">
+          <span class="recording-dot"></span>
+          <span id="webcam-indicator-text">LIVE</span>
+        </div>
+      </div>
+      
+      <div class="webcam-controls">
+        <button type="button" class="button secondary" id="webcam-btn-cancel" onclick="closeWebcamModal()" data-i18n="tool.cancel">Cancel</button>
+        <button type="button" class="button secondary" id="webcam-btn-retake" onclick="startWebcamStream()" style="display:none;" data-i18n="tool.retake">Retake</button>
+        <button type="button" class="button" id="webcam-btn-capture" onclick="captureSnapshot()" style="background:#0f766e; color:white; border:none;">Capture Photo</button>
+        <button type="button" class="button" id="webcam-btn-use" onclick="useCapturedSnapshot()" style="display:none; background:#10b981; border:none;">Use Photo</button>
+      </div>
+    </div>
+  </div>
 {% endblock %}
