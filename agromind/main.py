@@ -80,9 +80,15 @@ app.add_middleware(SessionMiddleware, secret_key=session_secret, https_only=os.g
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
-# Configure and ensure secure upload directory exists
+# Configure and ensure secure upload directory exists (handle read-only serverless filesystems gracefully)
 UPLOADS_DIR = BASE_DIR / "static" / "uploads"
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+IS_READ_ONLY_FS = False
+try:
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+except Exception as e:
+    print(f"Warning: Upload directory could not be created ({e}). Falling back to /tmp.")
+    IS_READ_ONLY_FS = True
+
 
 
 
@@ -289,14 +295,28 @@ async def run_tool(
                     file_ext = ".jpg"
             
             unique_filename = f"{secrets.token_hex(8)}{file_ext}"
-            saved_path = UPLOADS_DIR / unique_filename
             
-            with open(saved_path, "wb") as f:
-                f.write(content)
+            # Save based on filesystem writeability (using /tmp fallback on read-only systems)
+            if not IS_READ_ONLY_FS:
+                try:
+                    saved_path = UPLOADS_DIR / unique_filename
+                    with open(saved_path, "wb") as f:
+                        f.write(content)
+                    print(f"[UPLOAD SUCCESS] {uploaded_asset.filename} -> {saved_path} ({file_size} bytes)")
+                except Exception as e:
+                    print(f"Failed to write to UPLOADS_DIR, falling back to /tmp: {e}")
+                    saved_path = Path("/tmp") / unique_filename
+                    with open(saved_path, "wb") as f:
+                        f.write(content)
+                    print(f"[UPLOAD SUCCESS TEMP] {uploaded_asset.filename} -> {saved_path} ({file_size} bytes)")
+            else:
+                saved_path = Path("/tmp") / unique_filename
+                with open(saved_path, "wb") as f:
+                    f.write(content)
+                print(f"[UPLOAD SUCCESS TEMP] {uploaded_asset.filename} -> {saved_path} ({file_size} bytes)")
                 
             # Reset file pointer again so downstream processes can read it fully
             await uploaded_asset.seek(0)
-            print(f"[UPLOAD SUCCESS] {uploaded_asset.filename} -> {unique_filename} ({file_size} bytes)")
             
         except ValueError as exc:
             return page(
