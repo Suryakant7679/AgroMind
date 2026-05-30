@@ -428,7 +428,7 @@ async def generate_ai_response(
     plan: str = "starter",
 ) -> tuple[str, str, str]:
     fields_copy = fields.copy()
-    if tool_id == "agriculture-tools":
+    if tool_id in {"agriculture-tools", "smart-farming-assistant"}:
         loc_str = fields.get("location", "")
         if not loc_str:
             # Fallback to state or market district if location not provided
