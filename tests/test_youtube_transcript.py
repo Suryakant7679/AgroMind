@@ -4,6 +4,7 @@ from types import ModuleType
 
 import agromind.ai as ai
 from agromind.ai import (
+    extract_pdf_text,
     YOUTUBE_TRANSCRIPT_MAX_CHARS,
     extract_youtube_video_id,
     fetch_youtube_transcript_text,
@@ -86,6 +87,21 @@ def test_truncate_youtube_transcript_limits_large_prompts():
 
     assert was_truncated is True
     assert len(trimmed) <= YOUTUBE_TRANSCRIPT_MAX_CHARS
+
+
+def test_extract_pdf_text_reads_selectable_pdf_content():
+    import fitz
+
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Photosynthesis converts light energy into chemical energy.")
+    content = doc.write()
+    doc.close()
+
+    extracted = extract_pdf_text(content)
+
+    assert "Photosynthesis converts light energy into chemical energy." in extracted
+    assert "--- Page 1 ---" in extracted
 
 
 def test_youtube_generation_falls_back_when_transcript_unavailable(monkeypatch):

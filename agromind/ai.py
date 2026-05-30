@@ -170,6 +170,36 @@ class AIProviderError(RuntimeError):
         self.user_message = user_message
 
 
+PDF_TEXT_MAX_CHARS = 18000
+PDF_TEXT_MAX_PAGES = 25
+
+
+def extract_pdf_text(content: bytes, max_chars: int = PDF_TEXT_MAX_CHARS, max_pages: int = PDF_TEXT_MAX_PAGES) -> str:
+    if not content:
+        return ""
+
+    try:
+        import fitz
+    except Exception as exc:
+        raise AIProviderError("PDF reading is not available. Install PyMuPDF to analyze uploaded PDFs.") from exc
+
+    text_parts = []
+    with fitz.open(stream=content, filetype="pdf") as document:
+        for page_index, page in enumerate(document):
+            if page_index >= max_pages:
+                break
+            page_text = page.get_text("text").strip()
+            if page_text:
+                text_parts.append(f"--- Page {page_index + 1} ---\n{page_text}")
+            if sum(len(part) for part in text_parts) >= max_chars:
+                break
+
+    text = "\n\n".join(text_parts).strip()
+    if len(text) > max_chars:
+        text = text[:max_chars].rsplit(" ", 1)[0].strip()
+    return text
+
+
 async def summarize_file(file: UploadFile | None) -> tuple[str | None, str | None, str | None]:
     if not file or not file.filename:
         return None, None, None
@@ -179,6 +209,21 @@ async def summarize_file(file: UploadFile | None) -> tuple[str | None, str | Non
         return None, None, None
     size_kb = round(len(content) / 1024)
     summary = f"Name: {file.filename}\nType: {file.content_type or 'unknown'}\nSize: {size_kb} KB"
+    is_pdf = (file.content_type or "").lower() == "application/pdf" or file.filename.lower().endswith(".pdf")
+    if is_pdf:
+        extracted_text = extract_pdf_text(content)
+        if extracted_text:
+            summary = (
+                f"{summary}\n\n"
+                "Extracted PDF text for analysis:\n"
+                f"{extracted_text}"
+            )
+        else:
+            summary = (
+                f"{summary}\n\n"
+                "No selectable text could be extracted from this PDF. It may be a scanned/image-only document. "
+                "Ask the user for clear page images or enable OCR support before making document-specific claims."
+            )
     encoded = base64.b64encode(content).decode("utf-8")
     return summary, encoded, file.content_type
 
