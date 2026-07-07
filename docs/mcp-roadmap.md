@@ -15,7 +15,6 @@ Legend:
 | ✅ | Playwright MCP | Test `/login`, `/dashboard`, `/agents`, tool forms, UI flows | Added to `.mcp.example.json` |
 | ✅ | GitHub MCP | Repo, PRs, issues, deployment checks, code security context | Added to `.mcp.example.json` |
 | ✅ | Filesystem MCP | Controlled local repo file access | Added to `.mcp.example.json`, scoped to this repo |
-| ✅ | Git MCP | Local branch, diff, commit, history context | Added to `.mcp.example.json`; requires `uvx` locally |
 | ✅ | Fetch MCP | Documentation and API reference lookup | Added to `.mcp.example.json` |
 | ✅ | Memory MCP | Assistant-side development memory | Added to `.mcp.example.json` |
 

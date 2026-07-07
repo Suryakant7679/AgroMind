@@ -24,14 +24,6 @@
         "C:\\Users\\surya\\OneDrive\\Desktop\\AgroMind"
       ]
     },
-    "git": {
-      "command": "uvx",
-      "args": [
-        "mcp-server-git",
-        "--repository",
-        "C:\\Users\\surya\\OneDrive\\Desktop\\AgroMind"
-      ]
-    },
     "fetch": {
       "command": "cmd",
       "args": [

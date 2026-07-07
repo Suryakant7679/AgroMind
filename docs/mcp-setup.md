@@ -102,26 +102,7 @@ Use for controlled local file reads/edits by MCP clients. Scope it only to this 
 }
 ```
 
-### 5. Git MCP
-
-Use for repository history, branch-aware diffs, and local Git inspection. Keep it scoped to this repo.
-
-```json
-{
-  "mcpServers": {
-    "git": {
-      "command": "uvx",
-      "args": [
-        "mcp-server-git",
-        "--repository",
-        "C:\\Users\\surya\\OneDrive\\Desktop\\AgroMind"
-      ]
-    }
-  }
-}
-```
-
-### 6. Fetch MCP
+### 5. Fetch MCP
 
 Use for controlled documentation lookups, such as provider docs, API references, and deployment docs.
 
@@ -136,7 +117,7 @@ Use for controlled documentation lookups, such as provider docs, API references,
 }
 ```
 
-### 7. Memory MCP
+### 6. Memory MCP
 
 Useful for the development assistant's long-running project notes. This is separate from AgroMind's app-level `agent_memory` table.
 
@@ -151,7 +132,7 @@ Useful for the development assistant's long-running project notes. This is separ
 }
 ```
 
-### 8. AgroMind Agriculture MCP
+### 7. AgroMind Agriculture MCP
 
 Local project MCP server for agriculture agents. It starts with environmental context, crop calendar guidance, and mandi-price guidance.
 
@@ -166,7 +147,7 @@ Local project MCP server for agriculture agents. It starts with environmental co
 }
 ```
 
-### 9. AgroMind Health Evidence MCP
+### 8. AgroMind Health Evidence MCP
 
 Local read-only project MCP server for healthcare agents. It provides safe lab-marker explanations, medication safety questions, symptom red flags, and evidence-search guidance. It does not diagnose or prescribe.
 
@@ -181,7 +162,7 @@ Local read-only project MCP server for healthcare agents. It provides safe lab-m
 }
 ```
 
-### 10. AgroMind Education MCP
+### 9. AgroMind Education MCP
 
 Local project MCP server for education agents. It supports YouTube learning context, quiz planning, revision planning, and lesson outlines.
 
@@ -201,7 +182,7 @@ Local project MCP server for education agents. It supports YouTube learning cont
 1. Supabase MCP, read-only and project-scoped.
 2. Playwright MCP for UI verification.
 3. GitHub MCP for deployment/PR context.
-4. Filesystem and Git MCP for local code context if your MCP client lacks native repo access.
+4. Filesystem MCP for local code context if your MCP client lacks native repo access.
 5. Fetch MCP for documentation.
 6. Memory MCP for assistant continuity.
 7. AgroMind Agriculture MCP for Farmer Agent domain tools.
@@ -230,9 +211,6 @@ args = ["@playwright/mcp@latest"]
 command = "cmd"
 args = ["/c", "npx", "-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\surya\\OneDrive\\Desktop\\AgroMind"]
 
-[mcp_servers.git]
-command = "uvx"
-args = ["mcp-server-git", "--repository", "C:\\Users\\surya\\OneDrive\\Desktop\\AgroMind"]
 ```
 
 For Supabase and GitHub remote MCP, use your MCP client's remote HTTP server support and OAuth flow where available.
