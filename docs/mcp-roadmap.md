@@ -25,6 +25,7 @@ Legend:
 | [x] | Filesystem MCP | Controlled local repo file access | Added to `.mcp.example.json`, scoped to this repo |
 | [x] | Fetch MCP | Documentation and API reference lookup | Added to `.mcp.example.json` |
 | [x] | Memory MCP | Assistant-side development memory | Added to `.mcp.example.json` |
+| [x] | Workspace Chatbot | Separate chatbot that understands user tool history and saved outputs | Added as `/chatbot` and `/api/chatbot/chat` |
 
 ## Phase 2: Agriculture Agent MCP Servers
 
@@ -81,11 +82,12 @@ Legend:
 6. [>] Configure Supabase MCP with real `project_ref` in your local MCP client.
 7. [>] Run `supabase/schema.sql` so `agent_memory` exists.
 8. [>] Add Playwright MCP in your local MCP client and test `/agents`.
-9. [>] Polish current deployed MVP for demo readiness.
-10. [ ] Add Manim/Matplotlib render MCP only if advanced plot images/videos are really needed.
-11. [ ] Add Google Drive/Sheets/Gmail only after approval workflow review.
-12. [ ] Add real agriculture/health/education external MCP integrations one by one.
-13. [ ] Add monitoring, payment verification, admin diagnostics, and production hardening.
+9. [x] Add separate workspace chatbot with context of recent user tools and saved outputs.
+10. [>] Polish current deployed MVP for demo readiness.
+11. [ ] Add Manim/Matplotlib render MCP only if advanced plot images/videos are really needed.
+12. [ ] Add Google Drive/Sheets/Gmail only after approval workflow review.
+13. [ ] Add real agriculture/health/education external MCP integrations one by one.
+14. [ ] Add monitoring, payment verification, admin diagnostics, and production hardening.
 
 ## Notes
 

@@ -22,6 +22,7 @@ from agromind.agent_actions import ACTION_CONFIG, create_draft_for_output, execu
 from agromind.agents import AgentChatRequest, AgentOrchestrator
 from agromind.ai import AIProviderError, generate_ai_response
 from agromind.billing import all_plans, can_use_plan, estimate_cost, estimate_prompt_tokens, get_plan
+from agromind.chatbot import WorkspaceChatRequest, WorkspaceChatbot
 from agromind.data import DOMAINS, all_tools, get_domain, get_tool
 from agromind.models import (
     DEFAULT_LANGUAGE,
@@ -82,6 +83,7 @@ app.add_middleware(SessionMiddleware, secret_key=session_secret, https_only=os.g
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 agent_orchestrator = AgentOrchestrator()
+workspace_chatbot = WorkspaceChatbot()
 
 # Configure and ensure secure upload directory exists (handle read-only serverless filesystems gracefully)
 UPLOADS_DIR = BASE_DIR / "static" / "uploads"
@@ -106,6 +108,18 @@ async def agent_chat(request: Request, payload: AgentChatRequest):
     if isinstance(user_or_response, RedirectResponse):
         raise HTTPException(status_code=401, detail="Login required.")
     return await agent_orchestrator.reply(
+        payload,
+        user_id=user_or_response.get("id"),
+        access_token=user_or_response.get("access_token"),
+    )
+
+
+@app.post("/api/chatbot/chat")
+async def workspace_chat(request: Request, payload: WorkspaceChatRequest):
+    user_or_response = require_user(request)
+    if isinstance(user_or_response, RedirectResponse):
+        raise HTTPException(status_code=401, detail="Login required.")
+    return await workspace_chatbot.reply(
         payload,
         user_id=user_or_response.get("id"),
         access_token=user_or_response.get("access_token"),
@@ -222,6 +236,14 @@ def agents_page(request: Request):
     if isinstance(user_or_response, RedirectResponse):
         return user_or_response
     return page(request, "agents.html")
+
+
+@app.get("/chatbot", response_class=HTMLResponse)
+def chatbot_page(request: Request):
+    user_or_response = require_user(request)
+    if isinstance(user_or_response, RedirectResponse):
+        return user_or_response
+    return page(request, "chatbot.html")
 
 
 @app.get("/dashboard/{domain_id}", response_class=HTMLResponse)

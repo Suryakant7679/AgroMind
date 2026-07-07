@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block content %}
+  <style>
+    .chatbot-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 18rem;
+      gap: 1rem;
+      min-height: calc(100vh - 8rem);
+    }
+    .chatbot-panel {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: calc(100vh - 8rem);
+    }
+    .chatbot-messages {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding: 0.5rem 0;
+    }
+    .chatbot-msg {
+      max-width: min(48rem, 92%);
+      border: 1px solid var(--line);
+      border-radius: 0.5rem;
+      padding: 0.8rem 0.9rem;
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+    .chatbot-msg.user {
+      align-self: flex-end;
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+    .chatbot-msg.assistant {
+      align-self: flex-start;
+      background: #f8fafc;
+    }
+    .chatbot-composer {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.75rem;
+      align-items: end;
+      border-top: 1px solid var(--line);
+      padding-top: 1rem;
+    }
+    .chatbot-composer textarea {
+      min-height: 4.5rem;
+      resize: vertical;
+    }
+    .context-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    .context-pill {
+      border: 1px solid var(--line);
+      border-radius: 0.5rem;
+      padding: 0.55rem 0.65rem;
+      background: #f8fafc;
+      font-size: 0.86rem;
+      color: var(--text);
+    }
+    @media (max-width: 920px) {
+      .chatbot-shell {
+        grid-template-columns: 1fr;
+      }
+      .chatbot-panel {
+        min-height: 34rem;
+      }
+    }
+  </style>
+
+  <h1 class="page-title">Workspace Chatbot</h1>
+  <p class="muted">A separate chatbot that understands your recent AgroMind tool usage, saved outputs, and ongoing workspace context.</p>
+
+  <div class="chatbot-shell" style="margin-top:1rem">
+    <section class="card chatbot-panel">
+      <div>
+        <span class="badge">Workspace context</span>
+        <h2 style="margin:0.75rem 0 0">Chatbot</h2>
+      </div>
+
+      <div class="chatbot-messages" id="chatbot-messages">
+        <div class="chatbot-msg assistant">Ask me about tools you used, outputs you generated, or what to do next in AgroMind.</div>
+      </div>
+
+      <form class="chatbot-composer" onsubmit="sendChatbotMessage(event)">
+        <textarea id="chatbot-message-input" placeholder="Example: What tools did I use recently, and what should I do next?" required></textarea>
+        <button class="button" id="chatbot-send-button" type="submit">Send</button>
+      </form>
+    </section>
+
+    <aside class="card">
+      <span class="badge">Memory</span>
+      <h2 style="margin-top:0.75rem">Context Seen</h2>
+      <p class="muted" style="font-size:0.9rem">After each reply, this area shows recent saved tools the chatbot used as context.</p>
+      <div class="context-list" id="chatbot-context-list">
+        <div class="context-pill">No context loaded yet</div>
+      </div>
+      <p class="muted" style="font-size:0.86rem">Session: <span id="chatbot-session-label"></span></p>
+    </aside>
+  </div>
+
+  <script>
+    const chatbotSessionId = `workspace-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    document.getElementById("chatbot-session-label").textContent = chatbotSessionId.slice(0, 18);
+
+    function appendChatbotMessage(role, text) {
+      const messages = document.getElementById("chatbot-messages");
+      const item = document.createElement("div");
+      item.className = `chatbot-msg ${role}`;
+      item.textContent = text;
+      messages.appendChild(item);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function renderContext(items) {
+      const list = document.getElementById("chatbot-context-list");
+      list.innerHTML = "";
+      const values = Array.isArray(items) && items.length ? items : ["No saved tool context found yet"];
+      values.slice(0, 8).forEach((label) => {
+        const item = document.createElement("div");
+        item.className = "context-pill";
+        item.textContent = label;
+        list.appendChild(item);
+      });
+    }
+
+    async function sendChatbotMessage(event) {
+      event.preventDefault();
+      const input = document.getElementById("chatbot-message-input");
+      const button = document.getElementById("chatbot-send-button");
+      const message = input.value.trim();
+      if (!message) return;
+
+      appendChatbotMessage("user", message);
+      input.value = "";
+      button.disabled = true;
+      button.textContent = "Thinking";
+
+      try {
+        const response = await fetch("/api/chatbot/chat", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            message,
+            session_id: chatbotSessionId
+          })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Chatbot request failed.");
+        }
+        appendChatbotMessage("assistant", data.answer || "No response.");
+        renderContext(data.context_items);
+      } catch (error) {
+        appendChatbotMessage("assistant", error.message || "Chatbot request failed.");
+      } finally {
+        button.disabled = false;
+        button.textContent = "Send";
+        input.focus();
+      }
+    }
+  </script>
+{% endblock %}
