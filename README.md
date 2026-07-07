@@ -38,6 +38,7 @@ agromind/
   data.py              Domain and tool definitions
   prompts.py           Prompt builders
   supabase_store.py    Supabase database helpers
+  chatbot.py           Workspace chatbot with saved-output context
   static/styles.css    Plain CSS
   templates/           Jinja HTML pages
 supabase/schema.sql    Existing database schema
@@ -147,6 +148,8 @@ Start with Supabase MCP in project-scoped read-only mode, then add Playwright MC
 /dashboard                Tool dashboard
 /dashboard/{domain}       Domain page
 /dashboard/{domain}/{tool} Tool workbench
+/agents                   Domain agent chat
+/chatbot                  Workspace chatbot with recent tool/output context
 /analytics                Analytics
 /admin                    Admin
 /profile                  Profile

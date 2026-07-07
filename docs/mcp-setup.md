@@ -5,7 +5,7 @@ This project is now a good fit for MCP-assisted development because it has:
 - FastAPI routes and Jinja UI that benefit from browser automation.
 - Supabase auth, RLS, and `agent_memory` schema that benefit from database-aware tools.
 - GitHub/Vercel deployment status that benefits from repository and CI/CD context.
-- Agent workflows that should be tested with real app state, not only static code reads.
+- Workspace chat and agent flows that should be tested with real app state, not only static code reads.
 
 Do not commit real tokens or personal MCP client files. Use `.mcp.example.json` as a template only.
 
@@ -65,8 +65,9 @@ Use for UI flows:
 - `/login`
 - `/dashboard`
 - `/agents`
+- `/chatbot`
 - tool submission
-- voice/agent chat widget checks
+- voice assistant, agent chat, and workspace chatbot checks
 
 Standard config:
 
@@ -134,7 +135,7 @@ Useful for the development assistant's long-running project notes. This is separ
 
 ### 7. AgroMind Agriculture MCP
 
-Local project MCP server for agriculture agents. It starts with environmental context, crop calendar guidance, and mandi-price guidance.
+Optional local project MCP server for agriculture domain helpers. It starts with environmental context, crop calendar guidance, and mandi-price guidance. The live `/agents` and `/chatbot` routes do not automatically call it.
 
 ```json
 {
@@ -149,7 +150,7 @@ Local project MCP server for agriculture agents. It starts with environmental co
 
 ### 8. AgroMind Health Evidence MCP
 
-Local read-only project MCP server for healthcare agents. It provides safe lab-marker explanations, medication safety questions, symptom red flags, and evidence-search guidance. It does not diagnose or prescribe.
+Optional local read-only project MCP server for healthcare helpers. It provides safe lab-marker explanations, medication safety questions, symptom red flags, and evidence-search guidance. It does not diagnose or prescribe.
 
 ```json
 {
@@ -164,7 +165,7 @@ Local read-only project MCP server for healthcare agents. It provides safe lab-m
 
 ### 9. AgroMind Education MCP
 
-Local project MCP server for education agents. It supports YouTube learning context, quiz planning, revision planning, and lesson outlines.
+Optional local project MCP server for education helpers. It supports YouTube learning context, quiz planning, revision planning, lesson outlines, and plot planning for MCP clients.
 
 ```json
 {
@@ -185,9 +186,9 @@ Local project MCP server for education agents. It supports YouTube learning cont
 4. Filesystem MCP for local code context if your MCP client lacks native repo access.
 5. Fetch MCP for documentation.
 6. Memory MCP for assistant continuity.
-7. AgroMind Agriculture MCP for Farmer Agent domain tools.
-8. AgroMind Health Evidence MCP for Doctor Agent read-only safety tools.
-9. AgroMind Education MCP for Tutor Agent learning workflows.
+7. AgroMind Agriculture MCP only when a local MCP client needs agriculture helper tools.
+8. AgroMind Health Evidence MCP only when a local MCP client needs read-only safety helpers.
+9. AgroMind Education MCP only when a local MCP client needs learning workflow helpers.
 
 ## Security Rules For This Project
 
@@ -220,6 +221,6 @@ For Supabase and GitHub remote MCP, use your MCP client's remote HTTP server sup
 1. Add Supabase MCP with `project_ref` and `read_only=true`.
 2. Confirm the `agent_memory` table exists after running `supabase/schema.sql`.
 3. Add Playwright MCP.
-4. Test `/agents` with a logged-in user.
+4. Test `/agents` and `/chatbot` with a logged-in user.
 5. Add GitHub MCP after OAuth or token permissions are clear.
 6. Keep write-capable database and GitHub tools disabled until a specific task needs them.
