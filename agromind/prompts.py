@@ -116,7 +116,7 @@ The provider keys are not configured yet, so this response shows the expected re
 
 ### Report Structure
 - The submitted fields were received and validated.
-- Add `OPENAI_API_KEY` or `GEMINI_API_KEY` to enable provider-backed responses.
+- Add `GROQ_API_KEY` or `GEMINI_API_KEY` to enable provider-backed responses.
 - The final response will follow the required structure for {hints}.
 
 ### Next Steps

@@ -68,7 +68,6 @@ def test_agent_chat_uses_authenticated_agent_orchestrator(monkeypatch):
 
 def test_agent_orchestrator_falls_back_without_provider(monkeypatch):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setattr(store, "fetch_agent_memory", lambda *args, **kwargs: [])
     saved_messages = []
     monkeypatch.setattr(store, "save_agent_memory", lambda *args, **kwargs: saved_messages.append(args))
@@ -89,7 +88,6 @@ def test_agent_orchestrator_falls_back_without_provider(monkeypatch):
 
 def test_tutor_agent_uses_plot_tool_in_fallback(monkeypatch):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setattr(store, "fetch_agent_memory", lambda *args, **kwargs: [])
     monkeypatch.setattr(store, "save_agent_memory", lambda *args, **kwargs: None)
 

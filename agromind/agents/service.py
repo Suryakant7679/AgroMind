@@ -232,18 +232,6 @@ class AgentOrchestrator:
                 )
                 answer = completion.choices[0].message.content or ""
                 provider = f"groq:{model}"
-            elif os.getenv("OPENAI_API_KEY"):
-                from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
-
-                model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-                client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=45)
-                completion = client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    temperature=agent.temperature,
-                )
-                answer = completion.choices[0].message.content or ""
-                provider = f"openai:{model}"
             else:
                 answer = self.fallback_answer(agent, request.message, tool_results)
         except (APIConnectionError, APITimeoutError) as exc:

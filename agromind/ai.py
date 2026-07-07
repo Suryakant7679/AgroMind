@@ -519,36 +519,6 @@ async def generate_ai_response(
         except Exception as exc:
             raise AIProviderError("Groq request failed. Check your API key and model config.") from exc
 
-    if os.getenv("OPENAI_API_KEY") and not prefer_gemini:
-        try:
-            from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
-
-
-            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=45)
-            content = user_prompt
-            if image_base64 and mime_type and mime_type.startswith("image/"):
-                content = [
-                    {"type": "text", "text": user_prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_base64}"}},
-                ]
-            completion = client.chat.completions.create(
-                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": content},
-                ],
-            )
-            return completion.choices[0].message.content or "", "openai", language["code"]
-        except APITimeoutError as exc:
-            raise AIProviderError("OpenAI timed out. Try again with a shorter prompt or smaller file.") from exc
-        except APIConnectionError as exc:
-            raise AIProviderError("Could not reach OpenAI. Check network access and provider status.") from exc
-        except APIStatusError as exc:
-            status = getattr(exc, "status_code", "unknown")
-            raise AIProviderError(f"OpenAI returned an error ({status}). Check your API key, quota, and model name.") from exc
-        except Exception as exc:
-            raise AIProviderError("OpenAI request failed. Check your API key, quota, and model configuration.") from exc
-
     if os.getenv("GEMINI_API_KEY"):
         try:
             import google.generativeai as genai

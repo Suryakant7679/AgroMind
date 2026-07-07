@@ -105,7 +105,7 @@ def test_extract_pdf_text_reads_selectable_pdf_content():
 
 
 def test_youtube_generation_falls_back_when_transcript_unavailable(monkeypatch):
-    for key in ("GROQ_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY"):
+    for key in ("GROQ_API_KEY", "GEMINI_API_KEY"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setattr(ai, "fetch_youtube_transcript_text", lambda video_id: None)
     monkeypatch.setattr(ai, "fetch_youtube_video_title", lambda url: "Readable Video Title")

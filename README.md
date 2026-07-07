@@ -14,7 +14,7 @@ https://agromind-six.vercel.app
 - Jinja2 templates for server-rendered pages
 - Plain CSS for the interface
 - Supabase for auth and persistence
-- OpenAI and Gemini integrations
+- Groq and Gemini integrations
 - python-pptx for PowerPoint export
 
 ## Domains
@@ -34,7 +34,7 @@ This AI system does not replace professional doctors.
 ```txt
 agromind/
   main.py              FastAPI routes
-  ai.py                OpenAI/Gemini response generation
+  ai.py                Groq/Gemini response generation
   data.py              Domain and tool definitions
   prompts.py           Prompt builders
   supabase_store.py    Supabase database helpers
@@ -53,8 +53,7 @@ The app still reads `.env.local`, so your existing environment file can stay.
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-4o-mini
+GROQ_API_KEY=
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash-lite
 SESSION_SECRET=change-this-for-production

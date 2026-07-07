@@ -511,7 +511,6 @@ def settings(request: Request):
     configured = {
         "supabase_auth": supabase_auth_configured(),
         "supabase_database": supabase_database_configured(),
-        "openai": bool(os.getenv("OPENAI_API_KEY")),
         "gemini": bool(os.getenv("GEMINI_API_KEY")),
         "groq": bool(os.getenv("GROQ_API_KEY")),
     }
@@ -1021,20 +1020,6 @@ async def voice_assistant(
 
             completion = client.chat.completions.create(
                 model=assistant_model,
-                messages=messages,
-            )
-            response_text = completion.choices[0].message.content or ""
-        elif os.getenv("OPENAI_API_KEY"):
-            provider = "openai"
-            from openai import OpenAI
-            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=45)
-            messages = [{"role": "system", "content": system_prompt}]
-            for msg in chat_history:
-                messages.append({"role": msg["role"], "content": msg["content"]})
-            messages.append({"role": "user", "content": query})
-
-            completion = client.chat.completions.create(
-                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
                 messages=messages,
             )
             response_text = completion.choices[0].message.content or ""
