@@ -54,20 +54,6 @@
       align-self: flex-start;
       background: #f8fafc;
     }
-    .agent-artifact {
-      align-self: flex-start;
-      max-width: min(28rem, 92%);
-      overflow: auto;
-      border: 1px solid var(--line);
-      border-radius: 0.5rem;
-      background: white;
-      padding: 0.75rem;
-    }
-    .agent-artifact svg {
-      max-width: 100%;
-      height: auto;
-      display: block;
-    }
     .agent-composer {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
@@ -135,25 +121,12 @@
       document.getElementById("agent-active-label").textContent = button.textContent.trim();
     }
 
-    function appendAgentMessage(role, text, metaText = "") {
+    function appendAgentMessage(role, text) {
       const messages = document.getElementById("agent-messages");
       const item = document.createElement("div");
       item.className = `agent-msg ${role}`;
-      item.textContent = metaText ? `${text}\n\n${metaText}` : text;
+      item.textContent = text;
       messages.appendChild(item);
-      messages.scrollTop = messages.scrollHeight;
-    }
-
-    function appendAgentArtifacts(artifacts) {
-      if (!Array.isArray(artifacts)) return;
-      const messages = document.getElementById("agent-messages");
-      artifacts.forEach((artifact) => {
-        if (artifact.type !== "image/svg+xml" || !artifact.content) return;
-        const item = document.createElement("div");
-        item.className = "agent-artifact";
-        item.innerHTML = artifact.content;
-        messages.appendChild(item);
-      });
       messages.scrollTop = messages.scrollHeight;
     }
 
@@ -183,11 +156,7 @@
         if (!response.ok) {
           throw new Error(data.detail || "Agent request failed.");
         }
-        const tools = Array.isArray(data.tools_used) && data.tools_used.length
-          ? `Tools used: ${data.tools_used.join(", ")}`
-          : "";
-        appendAgentMessage("assistant", data.answer || "No response.", tools);
-        appendAgentArtifacts(data.artifacts);
+        appendAgentMessage("assistant", data.answer || "No response.");
       } catch (error) {
         appendAgentMessage("assistant", error.message || "Agent request failed.");
       } finally {

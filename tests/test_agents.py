@@ -86,7 +86,7 @@ def test_agent_orchestrator_falls_back_without_provider(monkeypatch):
     assert len(saved_messages) == 2
 
 
-def test_tutor_agent_uses_plot_tool_in_fallback(monkeypatch):
+def test_tutor_agent_falls_back_without_tool_calling(monkeypatch):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     monkeypatch.setattr(store, "fetch_agent_memory", lambda *args, **kwargs: [])
     monkeypatch.setattr(store, "save_agent_memory", lambda *args, **kwargs: None)
@@ -100,8 +100,4 @@ def test_tutor_agent_uses_plot_tool_in_fallback(monkeypatch):
     )
 
     assert response.agent == "tutor"
-    assert "agromind-education.create_plot_plan" in response.tools_used
-    assert "agromind-education-render.render_plot_svg" in response.tools_used
-    assert "Plot plan" in response.answer
-    assert response.artifacts
-    assert response.artifacts[0]["type"] == "image/svg+xml"
+    assert "Tutor Agent" in response.answer

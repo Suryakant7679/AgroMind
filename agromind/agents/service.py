@@ -5,7 +5,6 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from agromind.ai import AIProviderError
-from agromind.agents.tools import AgentToolResult, maybe_run_agent_tools
 from agromind.models import default_groq_model
 
 
@@ -24,8 +23,6 @@ class AgentChatResponse(BaseModel):
     answer: str
     provider: str
     sources: list[str] = Field(default_factory=list)
-    tools_used: list[str] = Field(default_factory=list)
-    artifacts: list[dict[str, str]] = Field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -147,17 +144,7 @@ class AgentOrchestrator:
                 )
         return sorted(matches, key=lambda item: item.score, reverse=True)[:limit]
 
-    def fallback_answer(
-        self,
-        agent: AgentProfile,
-        message: str,
-        tool_results: list[AgentToolResult] | None = None,
-    ) -> str:
-        tool_text = ""
-        if tool_results:
-            tool_text = "\n\nTool context used:\n" + "\n\n".join(
-                f"- {item.server}.{item.tool}:\n{item.summary}" for item in tool_results
-            )
+    def fallback_answer(self, agent: AgentProfile, message: str) -> str:
         return (
             f"## {agent.name}\n\n"
             "I can help with this as an AgroMind agent, but the live AI provider is not reachable right now. "
@@ -166,7 +153,6 @@ class AgentOrchestrator:
             "- Share any missing details such as location, age/class level, crop/stage, symptoms, or goal.\n"
             "- I will keep context across this agent chat when Supabase memory is configured.\n\n"
             "Try again once the provider connection is available."
-            f"{tool_text}"
         )
 
     def build_messages(
@@ -175,22 +161,16 @@ class AgentOrchestrator:
         message: str,
         memory: list[AgentMemoryMessage],
         context: list[RetrievedContext],
-        tool_results: list[AgentToolResult],
     ) -> list[dict]:
         context_text = "\n\n".join(f"Source: {item.source}\n{item.text}" for item in context)
-        tool_text = "\n\n".join(
-            f"Tool: {item.server}.{item.tool}\n{item.summary}" for item in tool_results if item.summary
-        )
         system_prompt = (
             f"{agent.system_prompt}\n\n"
             "You are operating inside AgroMind as an agent, not a one-shot form filler. "
-            "Use memory for continuity, use tool results when available, ask focused follow-up questions "
-            "when the task is under-specified, and suggest safe next actions. Keep answers practical and structured."
+            "Use memory for continuity, ask focused follow-up questions when the task is under-specified, "
+            "and suggest safe next actions. Keep answers practical and structured."
         )
         if context_text:
             system_prompt += f"\n\nRetrieved local knowledge:\n{context_text}"
-        if tool_text:
-            system_prompt += f"\n\nAgent tool results:\n{tool_text}"
 
         messages = [{"role": "system", "content": system_prompt}]
         for item in memory[-12:]:
@@ -212,8 +192,7 @@ class AgentOrchestrator:
         memory_rows = fetch_agent_memory(user_id, agent.id, session_id, access_token=access_token)
         memory = [AgentMemoryMessage(role=row.get("role", ""), content=row.get("content", "")) for row in memory_rows]
         context = self.search_knowledge(agent.id, request.message)
-        tool_results = await maybe_run_agent_tools(agent.id, request.message)
-        messages = self.build_messages(agent, request.message, memory, context, tool_results)
+        messages = self.build_messages(agent, request.message, memory, context)
 
         provider = "local"
         try:
@@ -234,20 +213,20 @@ class AgentOrchestrator:
                 answer = completion.choices[0].message.content or ""
                 provider = f"groq:{model}"
             else:
-                answer = self.fallback_answer(agent, request.message, tool_results)
+                answer = self.fallback_answer(agent, request.message)
         except (APIConnectionError, APITimeoutError) as exc:
-            answer = self.fallback_answer(agent, request.message, tool_results)
+            answer = self.fallback_answer(agent, request.message)
             provider = "local:fallback"
             print(f"Agent provider connection failed: {exc}")
         except APIStatusError as exc:
-            answer = self.fallback_answer(agent, request.message, tool_results)
+            answer = self.fallback_answer(agent, request.message)
             provider = "local:fallback"
             print(f"Agent provider status error: {getattr(exc, 'status_code', 'unknown')}")
         except AIProviderError as exc:
             answer = exc.user_message
             provider = "local:fallback"
         except Exception as exc:
-            answer = self.fallback_answer(agent, request.message, tool_results)
+            answer = self.fallback_answer(agent, request.message)
             provider = "local:fallback"
             print(f"Agent provider failed: {exc}")
 
@@ -260,10 +239,4 @@ class AgentOrchestrator:
             answer=answer,
             provider=provider,
             sources=[item.source for item in context],
-            tools_used=[f"{item.server}.{item.tool}" for item in tool_results],
-            artifacts=[
-                {"type": item.artifact_type, "content": item.artifact}
-                for item in tool_results
-                if item.artifact_type and item.artifact
-            ],
         )

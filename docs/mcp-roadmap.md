@@ -31,7 +31,7 @@ Legend:
 | Status | MCP server | Purpose in AgroMind | Suggested tools |
 |---|---|---|---|
 | [x] | AgroMind Agriculture MCP | Local domain MCP server with crop calendar and market guidance | `get_crop_calendar`, `get_mandi_price_guidance`, `get_environmental_context` |
-| [x] | Agent tool routing | Farmer Agent can call local agriculture tools before answering | Added in `agromind.agents.tools` |
+| [ ] | Agent tool routing | Optional future Farmer Agent tool calls | Removed from live MVP to keep the app simple |
 | [ ] | Weather MCP | Weather-only server, preferably Open-Meteo backed | `forecast_by_location`, `rainfall_risk`, `heat_stress_risk` |
 | [ ] | SoilGrids MCP | Soil profile and pH/nitrogen/organic-carbon lookup | `soil_profile`, `soil_constraints`, `crop_soil_match` |
 | [ ] | Market Price MCP | Mandi/commodity pricing from Data.gov.in or curated source | `mandi_price`, `price_trend`, `sell_or_hold_signal` |
@@ -42,7 +42,7 @@ Legend:
 | Status | MCP server | Purpose in AgroMind | Suggested tools |
 |---|---|---|---|
 | [x] | AgroMind Health Evidence MCP | Read-only medical evidence and safety lookup | `lookup_lab_marker`, `lookup_drug_safety`, `get_symptom_red_flags` |
-| [x] | Agent tool routing | Doctor Agent can call local health tools before answering | Added in `agromind.agents.tools` |
+| [ ] | Agent tool routing | Optional future Doctor Agent tool calls | Removed from live MVP to keep the app simple |
 | [ ] | PubMed/NCBI MCP | Research lookup for Doctor Agent | `search_pubmed`, `summarize_abstracts` |
 | [ ] | OpenFDA/RxNorm MCP | Drug labels, warnings, adverse events, medication normalization | `drug_label`, `drug_warnings`, `normalize_drug_name` |
 | [ ] | ClinicalTrials MCP | Trial lookup for education/research only | `search_trials`, `trial_summary` |
@@ -53,10 +53,8 @@ Legend:
 | Status | MCP server | Purpose in AgroMind | Suggested tools |
 |---|---|---|---|
 | [x] | AgroMind Education MCP | YouTube learning, notes, quiz, revision, lesson workflows | `get_youtube_learning_context`, `create_quiz_plan`, `create_revision_plan`, `create_lesson_outline` |
-| [x] | Education plotting tool | Plan classroom plots/graphs before rendering | `create_plot_plan` |
-| [x] | AgroMind Education Render MCP | Render lightweight SVG classroom plots in agent chat | `render_plot_svg` |
-| [x] | Agent tool routing | Tutor Agent can call local education tools before answering | Added in `agromind.agents.tools` |
-| [>] | Manim/Matplotlib Video MCP | Generate advanced chart images or lesson animations | `render_plot_image`, `render_manim_scene`, `export_visual_asset` |
+| [x] | Education plotting tool | Optional plot planning support for MCP clients | `create_plot_plan` |
+| [ ] | Manim/Matplotlib Video MCP | Optional advanced chart images or lesson animations | `render_plot_image`, `render_manim_scene`, `export_visual_asset` |
 | [ ] | Google Drive MCP | Store/read lesson plans, worksheets, reports | `search_docs`, `save_doc`, `read_doc` |
 | [ ] | Google Classroom MCP | Classroom assignment workflows | `list_courses`, `create_assignment`, `post_material` |
 | [ ] | Knowledge Base MCP | Local curriculum and school notes RAG | `search_curriculum`, `retrieve_notes` |
@@ -79,16 +77,15 @@ Legend:
 2. [x] Build custom AgroMind Agriculture MCP.
 3. [x] Build custom AgroMind Health Evidence MCP.
 4. [x] Build custom AgroMind Education MCP.
-5. [x] Wire local MCP-style tools into the live agent orchestrator.
+5. [x] Keep live agent chat simple with routing, memory, and local knowledge only.
 6. [>] Configure Supabase MCP with real `project_ref` in your local MCP client.
 7. [>] Run `supabase/schema.sql` so `agent_memory` exists.
 8. [>] Add Playwright MCP in your local MCP client and test `/agents`.
-9. [x] Add lightweight SVG render MCP for real plot previews.
-10. [>] Polish current deployed MVP for demo readiness.
-11. [>] Add Manim/Matplotlib render MCP for advanced plot images/videos.
-12. [ ] Add Google Drive/Sheets/Gmail only after approval workflow review.
-13. [ ] Add real agriculture/health/education external MCP integrations one by one.
-14. [ ] Add monitoring, payment verification, admin diagnostics, and production hardening.
+9. [>] Polish current deployed MVP for demo readiness.
+10. [ ] Add Manim/Matplotlib render MCP only if advanced plot images/videos are really needed.
+11. [ ] Add Google Drive/Sheets/Gmail only after approval workflow review.
+12. [ ] Add real agriculture/health/education external MCP integrations one by one.
+13. [ ] Add monitoring, payment verification, admin diagnostics, and production hardening.
 
 ## Notes
 
