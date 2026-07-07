@@ -22,6 +22,14 @@ def test_public_home_and_auth_pages_render():
         assert test_client.get("/signup").status_code == 200
 
 
+def test_health_endpoint_reports_ok():
+    with client() as test_client:
+        response = test_client.get("/api/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "service": "agromind"}
+
+
 def test_dashboard_requires_login():
     with client() as test_client:
         response = test_client.get("/dashboard", follow_redirects=False)

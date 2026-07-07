@@ -93,6 +93,11 @@ except Exception as e:
 
 
 
+@app.get("/api/health")
+def health_check():
+    return {"ok": True, "service": "agromind"}
+
+
 def user_from_session(request: Request) -> dict | None:
     return request.session.get("user")
 
