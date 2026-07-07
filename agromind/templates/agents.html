@@ -121,11 +121,11 @@
       document.getElementById("agent-active-label").textContent = button.textContent.trim();
     }
 
-    function appendAgentMessage(role, text) {
+    function appendAgentMessage(role, text, metaText = "") {
       const messages = document.getElementById("agent-messages");
       const item = document.createElement("div");
       item.className = `agent-msg ${role}`;
-      item.textContent = text;
+      item.textContent = metaText ? `${text}\n\n${metaText}` : text;
       messages.appendChild(item);
       messages.scrollTop = messages.scrollHeight;
     }
@@ -156,7 +156,10 @@
         if (!response.ok) {
           throw new Error(data.detail || "Agent request failed.");
         }
-        appendAgentMessage("assistant", data.answer || "No response.");
+        const tools = Array.isArray(data.tools_used) && data.tools_used.length
+          ? `Tools used: ${data.tools_used.join(", ")}`
+          : "";
+        appendAgentMessage("assistant", data.answer || "No response.", tools);
       } catch (error) {
         appendAgentMessage("assistant", error.message || "Agent request failed.");
       } finally {

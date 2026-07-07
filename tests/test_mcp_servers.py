@@ -78,6 +78,7 @@ def test_education_mcp_lists_tools():
     assert "create_quiz_plan" in names
     assert "create_revision_plan" in names
     assert "create_lesson_outline" in names
+    assert "create_plot_plan" in names
 
 
 def test_education_mcp_quiz_plan_tool():
@@ -104,3 +105,17 @@ def test_education_mcp_rejects_invalid_youtube_url_without_network():
 
     text = response["content"][0]["text"]
     assert "Invalid YouTube URL" in text
+
+
+def test_education_mcp_plot_plan_tool():
+    response = asyncio.run(
+        call_education_tool(
+            "create_plot_plan",
+            {"topic": "y = x^2", "plot_type": "function", "x_axis": "x", "y_axis": "y"},
+        )
+    )
+
+    text = response["content"][0]["text"]
+    assert "Plot plan" in text
+    assert "y = x^2" in text
+    assert "Manim" in text

@@ -85,3 +85,22 @@ def test_agent_orchestrator_falls_back_without_provider(monkeypatch):
     assert response.provider == "local"
     assert "Farmer Agent" in response.answer
     assert len(saved_messages) == 2
+
+
+def test_tutor_agent_uses_plot_tool_in_fallback(monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(store, "fetch_agent_memory", lambda *args, **kwargs: [])
+    monkeypatch.setattr(store, "save_agent_memory", lambda *args, **kwargs: None)
+
+    orchestrator = AgentOrchestrator()
+    response = __import__("asyncio").run(
+        orchestrator.reply(
+            AgentChatRequest(message="Make a plot for y = x^2", agent="auto", session_id="s1"),
+            user_id="user-1",
+        )
+    )
+
+    assert response.agent == "tutor"
+    assert "agromind-education.create_plot_plan" in response.tools_used
+    assert "Plot plan" in response.answer

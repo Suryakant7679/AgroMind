@@ -61,6 +61,20 @@ TOOLS = [
             "required": ["topic"],
         },
     },
+    {
+        "name": "create_plot_plan",
+        "description": "Create a plotting/visualization plan for math, science, and classroom explanations.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "topic": {"type": "string"},
+                "plot_type": {"type": "string", "description": "line, bar, scatter, function, timeline, or auto"},
+                "x_axis": {"type": "string"},
+                "y_axis": {"type": "string"},
+            },
+            "required": ["topic"],
+        },
+    },
 ]
 
 
@@ -136,6 +150,23 @@ def lesson_outline(topic: str, class_level: str = "", duration_minutes: int = 45
     )
 
 
+def plot_plan(topic: str, plot_type: str = "auto", x_axis: str = "", y_axis: str = "") -> str:
+    topic_text = topic.strip() or "selected concept"
+    plot_kind = (plot_type.strip() or "auto").lower()
+    x_label = x_axis.strip() or "independent variable"
+    y_label = y_axis.strip() or "dependent variable"
+    return (
+        f"Plot plan for {topic_text}:\n"
+        f"- Recommended plot type: {plot_kind}\n"
+        f"- X-axis: {x_label}\n"
+        f"- Y-axis: {y_label}\n"
+        "- Start with a clean title, labeled axes, units where relevant, and 5-10 representative points.\n"
+        "- For equations, calculate a small value table before drawing the curve.\n"
+        "- For classroom visuals, add one annotation that explains the main pattern.\n"
+        "- Rendering path: generate a lightweight chart in the app now; add Manim/Matplotlib rendering later if video or image export is required."
+    )
+
+
 async def call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     if name == "get_youtube_learning_context":
         return text_result(await youtube_context(str(arguments.get("url", ""))))
@@ -164,6 +195,16 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 str(arguments.get("topic", "")),
                 str(arguments.get("class_level", "")),
                 int(arguments.get("duration_minutes") or 45),
+            )
+        )
+
+    if name == "create_plot_plan":
+        return text_result(
+            plot_plan(
+                str(arguments.get("topic", "")),
+                str(arguments.get("plot_type", "auto")),
+                str(arguments.get("x_axis", "")),
+                str(arguments.get("y_axis", "")),
             )
         )
 
