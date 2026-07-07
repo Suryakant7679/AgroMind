@@ -135,6 +135,11 @@ ALLOW_DEMO_LOGIN=false
 
 In production, the app refuses to start with the default development session secret.
 
+## MCP-Assisted Development
+
+Recommended MCP servers and safe client templates are documented in `docs/mcp-setup.md`.
+Start with Supabase MCP in project-scoped read-only mode, then add Playwright MCP for UI testing and GitHub MCP for deployment context.
+
 ## Main Routes
 
 ```txt
