@@ -56,6 +56,20 @@
         "-m",
         "agromind.mcp_servers.agriculture"
       ]
+    },
+    "agromind-health-evidence": {
+      "command": "python",
+      "args": [
+        "-m",
+        "agromind.mcp_servers.health"
+      ]
+    },
+    "agromind-education": {
+      "command": "python",
+      "args": [
+        "-m",
+        "agromind.mcp_servers.education"
+      ]
     }
   }
 }

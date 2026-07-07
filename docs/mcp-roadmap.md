@@ -33,7 +33,7 @@ Legend:
 
 | Status | MCP server | Purpose in AgroMind | Suggested tools |
 |---|---|---|---|
-| 🔜 | AgroMind Health Evidence MCP | Read-only medical evidence and safety lookup | `search_health_evidence`, `lookup_lab_marker`, `lookup_drug_safety` |
+| ✅ | AgroMind Health Evidence MCP | Read-only medical evidence and safety lookup | Added as `python -m agromind.mcp_servers.health` in `.mcp.example.json` |
 | ⬜ | PubMed/NCBI MCP | Research lookup for Doctor Agent | `search_pubmed`, `summarize_abstracts` |
 | ⬜ | OpenFDA/RxNorm MCP | Drug labels, warnings, adverse events, medication normalization | `drug_label`, `drug_warnings`, `normalize_drug_name` |
 | ⬜ | ClinicalTrials MCP | Trial lookup for education/research only | `search_trials`, `trial_summary` |
@@ -43,7 +43,7 @@ Legend:
 
 | Status | MCP server | Purpose in AgroMind | Suggested tools |
 |---|---|---|---|
-| 🔜 | AgroMind Education MCP | YouTube learning, notes, quiz, revision workflows | `get_youtube_transcript`, `create_quiz`, `create_revision_plan` |
+| ✅ | AgroMind Education MCP | YouTube learning, notes, quiz, revision workflows | Added as `python -m agromind.mcp_servers.education` in `.mcp.example.json` |
 | ⬜ | Google Drive MCP | Store/read lesson plans, worksheets, reports | `search_docs`, `save_doc`, `read_doc` |
 | ⬜ | Google Classroom MCP | Classroom assignment workflows | `list_courses`, `create_assignment`, `post_material` |
 | ⬜ | Knowledge Base MCP | Local curriculum and school notes RAG | `search_curriculum`, `retrieve_notes` |
@@ -67,9 +67,9 @@ Legend:
 3. 🔜 Run `supabase/schema.sql` so `agent_memory` exists.
 4. 🔜 Add Playwright MCP in your local MCP client and test `/agents`.
 5. ✅ Build custom AgroMind Agriculture MCP.
-6. 🔜 Build custom AgroMind Health Evidence MCP.
-7. ⬜ Build custom AgroMind Education MCP.
-8. ⬜ Add Google Drive/Sheets/Gmail only after approval workflow review.
+6. ✅ Build custom AgroMind Health Evidence MCP.
+7. ✅ Build custom AgroMind Education MCP.
+8. 🔜 Add Google Drive/Sheets/Gmail only after approval workflow review.
 
 ## Notes
 

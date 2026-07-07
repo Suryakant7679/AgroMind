@@ -166,6 +166,36 @@ Local project MCP server for agriculture agents. It starts with environmental co
 }
 ```
 
+### 9. AgroMind Health Evidence MCP
+
+Local read-only project MCP server for healthcare agents. It provides safe lab-marker explanations, medication safety questions, symptom red flags, and evidence-search guidance. It does not diagnose or prescribe.
+
+```json
+{
+  "mcpServers": {
+    "agromind-health-evidence": {
+      "command": "python",
+      "args": ["-m", "agromind.mcp_servers.health"]
+    }
+  }
+}
+```
+
+### 10. AgroMind Education MCP
+
+Local project MCP server for education agents. It supports YouTube learning context, quiz planning, revision planning, and lesson outlines.
+
+```json
+{
+  "mcpServers": {
+    "agromind-education": {
+      "command": "python",
+      "args": ["-m", "agromind.mcp_servers.education"]
+    }
+  }
+}
+```
+
 ## Suggested Priority
 
 1. Supabase MCP, read-only and project-scoped.
@@ -175,6 +205,8 @@ Local project MCP server for agriculture agents. It starts with environmental co
 5. Fetch MCP for documentation.
 6. Memory MCP for assistant continuity.
 7. AgroMind Agriculture MCP for Farmer Agent domain tools.
+8. AgroMind Health Evidence MCP for Doctor Agent read-only safety tools.
+9. AgroMind Education MCP for Tutor Agent learning workflows.
 
 ## Security Rules For This Project
 
