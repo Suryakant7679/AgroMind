@@ -115,91 +115,113 @@ alter table public.agent_action_drafts enable row level security;
 alter table public.agent_action_runs enable row level security;
 alter table public.agent_memory enable row level security;
 
+drop policy if exists "Users can read own profile" on public.profiles;
 create policy "Users can read own profile"
 on public.profiles for select
 using (auth.uid() = id);
 
+drop policy if exists "Users can update own profile" on public.profiles;
 create policy "Users can update own profile"
 on public.profiles for update
 using (auth.uid() = id);
 
+drop policy if exists "Users can read own outputs" on public.ai_outputs;
 create policy "Users can read own outputs"
 on public.ai_outputs for select
 using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own outputs" on public.ai_outputs;
 create policy "Users can insert own outputs"
 on public.ai_outputs for insert
 with check (auth.uid() = user_id);
 
+drop policy if exists "Users can read own usage" on public.usage_events;
 create policy "Users can read own usage"
 on public.usage_events for select
 using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own usage" on public.usage_events;
 create policy "Users can insert own usage"
 on public.usage_events for insert
 with check (auth.uid() = user_id);
 
 
+drop policy if exists "Users can read own subscriptions" on public.subscriptions;
 create policy "Users can read own subscriptions"
 on public.subscriptions for select
 using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own subscriptions" on public.subscriptions;
 create policy "Users can insert own subscriptions"
 on public.subscriptions for insert
 with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update own subscriptions" on public.subscriptions;
 create policy "Users can update own subscriptions"
 on public.subscriptions for update
 using (auth.uid() = user_id);
 
+drop policy if exists "Users can read own payments" on public.payments;
 create policy "Users can read own payments"
 on public.payments for select
 using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own payments" on public.payments;
 create policy "Users can insert own payments"
 on public.payments for insert
 with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update own payments" on public.payments;
 create policy "Users can update own payments"
 on public.payments for update
 using (auth.uid() = user_id);
 
+drop policy if exists "Users can read own connected accounts" on public.connected_accounts;
 create policy "Users can read own connected accounts"
 on public.connected_accounts for select
 using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own connected accounts" on public.connected_accounts;
 create policy "Users can insert own connected accounts"
 on public.connected_accounts for insert
 with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update own connected accounts" on public.connected_accounts;
 create policy "Users can update own connected accounts"
 on public.connected_accounts for update
 using (auth.uid() = user_id);
 
+drop policy if exists "Users can read own action drafts" on public.agent_action_drafts;
 create policy "Users can read own action drafts"
 on public.agent_action_drafts for select
 using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own action drafts" on public.agent_action_drafts;
 create policy "Users can insert own action drafts"
 on public.agent_action_drafts for insert
 with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update own action drafts" on public.agent_action_drafts;
 create policy "Users can update own action drafts"
 on public.agent_action_drafts for update
 using (auth.uid() = user_id);
 
+drop policy if exists "Users can read own action runs" on public.agent_action_runs;
 create policy "Users can read own action runs"
 on public.agent_action_runs for select
 using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own action runs" on public.agent_action_runs;
 create policy "Users can insert own action runs"
 on public.agent_action_runs for insert
 with check (auth.uid() = user_id);
 
+drop policy if exists "Users can read own agent memory" on public.agent_memory;
 create policy "Users can read own agent memory"
 on public.agent_memory for select
 using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own agent memory" on public.agent_memory;
 create policy "Users can insert own agent memory"
 on public.agent_memory for insert
 with check (auth.uid() = user_id);
