@@ -101,4 +101,7 @@ def test_tutor_agent_uses_plot_tool_in_fallback(monkeypatch):
 
     assert response.agent == "tutor"
     assert "agromind-education.create_plot_plan" in response.tools_used
+    assert "agromind-education-render.render_plot_svg" in response.tools_used
     assert "Plot plan" in response.answer
+    assert response.artifacts
+    assert response.artifacts[0]["type"] == "image/svg+xml"

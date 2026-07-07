@@ -3,6 +3,8 @@ import asyncio
 from agromind.mcp_servers.agriculture import call_tool, handle_request
 from agromind.mcp_servers.education import call_tool as call_education_tool
 from agromind.mcp_servers.education import handle_request as handle_education_request
+from agromind.mcp_servers.education_render import call_tool as call_education_render_tool
+from agromind.mcp_servers.education_render import handle_request as handle_education_render_request
 from agromind.mcp_servers.health import call_tool as call_health_tool
 from agromind.mcp_servers.health import handle_request as handle_health_request
 
@@ -119,3 +121,24 @@ def test_education_mcp_plot_plan_tool():
     assert "Plot plan" in text
     assert "y = x^2" in text
     assert "Manim" in text
+
+
+def test_education_render_mcp_lists_tools():
+    response = asyncio.run(handle_education_render_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}))
+
+    names = {tool["name"] for tool in response["result"]["tools"]}
+    assert "render_plot_svg" in names
+
+
+def test_education_render_mcp_returns_svg():
+    response = asyncio.run(
+        call_education_render_tool(
+            "render_plot_svg",
+            {"title": "Plot y=x^2", "expression": "y=x^2"},
+        )
+    )
+
+    text = response["content"][0]["text"]
+    assert text.startswith("<svg")
+    assert "<polyline" in text
+    assert "Plot y=x^2" in text

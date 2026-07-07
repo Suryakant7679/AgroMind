@@ -3,6 +3,7 @@ from typing import Any, Awaitable, Callable
 
 from agromind.mcp_servers.agriculture import call_tool as call_agriculture_tool
 from agromind.mcp_servers.education import call_tool as call_education_tool
+from agromind.mcp_servers.education_render import call_tool as call_education_render_tool
 from agromind.mcp_servers.health import call_tool as call_health_tool
 
 
@@ -11,6 +12,8 @@ class AgentToolResult:
     server: str
     tool: str
     summary: str
+    artifact_type: str = ""
+    artifact: str = ""
 
 
 KNOWN_CROPS = [
@@ -63,6 +66,12 @@ def _tool_text(result: dict[str, Any]) -> str:
     return str(content[0].get("text", "")).strip()
 
 
+def _artifact_type(tool: str, text: str) -> str:
+    if tool == "render_plot_svg" and text.lstrip().startswith("<svg"):
+        return "image/svg+xml"
+    return ""
+
+
 async def _run(
     server: str,
     caller: Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]],
@@ -70,7 +79,10 @@ async def _run(
     arguments: dict[str, Any],
 ) -> AgentToolResult:
     result = await caller(tool, arguments)
-    return AgentToolResult(server=server, tool=tool, summary=_tool_text(result))
+    text = _tool_text(result)
+    artifact_type = _artifact_type(tool, text)
+    summary = "Generated SVG plot artifact for the user." if artifact_type else text
+    return AgentToolResult(server=server, tool=tool, summary=summary, artifact_type=artifact_type, artifact=text if artifact_type else "")
 
 
 async def maybe_run_agent_tools(agent_id: str, message: str) -> list[AgentToolResult]:
@@ -166,7 +178,13 @@ async def _tutor_tools(text: str, message: str) -> list[AgentToolResult]:
                 call_education_tool,
                 "create_plot_plan",
                 {"topic": message, "plot_type": "auto"},
-            )
+            ),
+            await _run(
+                "agromind-education-render",
+                call_education_render_tool,
+                "render_plot_svg",
+                {"title": message, "expression": message, "plot_type": "function"},
+            ),
         ]
 
     if _has_any(text, ["quiz", "mcq", "test", "practice questions"]):

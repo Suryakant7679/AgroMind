@@ -62,6 +62,13 @@
         "-m",
         "agromind.mcp_servers.education"
       ]
+    },
+    "agromind-education-render": {
+      "command": "python",
+      "args": [
+        "-m",
+        "agromind.mcp_servers.education_render"
+      ]
     }
   }
 }

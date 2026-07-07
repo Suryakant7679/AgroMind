@@ -25,6 +25,7 @@ class AgentChatResponse(BaseModel):
     provider: str
     sources: list[str] = Field(default_factory=list)
     tools_used: list[str] = Field(default_factory=list)
+    artifacts: list[dict[str, str]] = Field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -260,4 +261,9 @@ class AgentOrchestrator:
             provider=provider,
             sources=[item.source for item in context],
             tools_used=[f"{item.server}.{item.tool}" for item in tool_results],
+            artifacts=[
+                {"type": item.artifact_type, "content": item.artifact}
+                for item in tool_results
+                if item.artifact_type and item.artifact
+            ],
         )

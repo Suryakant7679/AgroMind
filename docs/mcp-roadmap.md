@@ -46,8 +46,9 @@ Legend:
 |---|---|---|---|
 | [x] | AgroMind Education MCP | YouTube learning, notes, quiz, revision, lesson workflows | `get_youtube_learning_context`, `create_quiz_plan`, `create_revision_plan`, `create_lesson_outline` |
 | [x] | Education plotting tool | Plan classroom plots/graphs before rendering | `create_plot_plan` |
+| [x] | AgroMind Education Render MCP | Render lightweight SVG classroom plots in agent chat | `render_plot_svg` |
 | [x] | Agent tool routing | Tutor Agent can call local education tools before answering | Added in `agromind.agents.tools` |
-| [>] | Manim/Matplotlib Render MCP | Generate real chart images or lesson animations | `render_plot_image`, `render_manim_scene`, `export_visual_asset` |
+| [>] | Manim/Matplotlib Video MCP | Generate advanced chart images or lesson animations | `render_plot_image`, `render_manim_scene`, `export_visual_asset` |
 | [ ] | Google Drive MCP | Store/read lesson plans, worksheets, reports | `search_docs`, `save_doc`, `read_doc` |
 | [ ] | Google Classroom MCP | Classroom assignment workflows | `list_courses`, `create_assignment`, `post_material` |
 | [ ] | Knowledge Base MCP | Local curriculum and school notes RAG | `search_curriculum`, `retrieve_notes` |
@@ -74,8 +75,9 @@ Legend:
 6. [>] Configure Supabase MCP with real `project_ref` in your local MCP client.
 7. [>] Run `supabase/schema.sql` so `agent_memory` exists.
 8. [>] Add Playwright MCP in your local MCP client and test `/agents`.
-9. [>] Add Manim/Matplotlib render MCP for real plot images/videos.
-10. [ ] Add Google Drive/Sheets/Gmail only after approval workflow review.
+9. [x] Add lightweight SVG render MCP for real plot previews.
+10. [>] Add Manim/Matplotlib render MCP for advanced plot images/videos.
+11. [ ] Add Google Drive/Sheets/Gmail only after approval workflow review.
 
 ## Notes
 
