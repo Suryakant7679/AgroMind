@@ -56,6 +56,43 @@ create table if not exists public.payments (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.connected_accounts (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references auth.users(id) on delete cascade,
+  provider text not null,
+  provider_account_id text,
+  provider_email text,
+  encrypted_refresh_token text,
+  scopes text[] not null default '{}',
+  status text not null default 'connected',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, provider)
+);
+
+create table if not exists public.agent_action_drafts (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references auth.users(id) on delete cascade,
+  source_output_id uuid references public.ai_outputs(id) on delete set null,
+  action_type text not null,
+  provider text not null,
+  draft_payload jsonb not null default '{}'::jsonb,
+  status text not null default 'pending',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.agent_action_runs (
+  id uuid primary key default uuid_generate_v4(),
+  draft_id uuid references public.agent_action_drafts(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete cascade,
+  provider text not null,
+  status text not null,
+  result jsonb not null default '{}'::jsonb,
+  error text,
+  created_at timestamptz not null default now()
+);
+
 alter table public.usage_events add column if not exists credits_used integer not null default 0;
 
 alter table public.profiles enable row level security;
@@ -63,6 +100,9 @@ alter table public.ai_outputs enable row level security;
 alter table public.usage_events enable row level security;
 alter table public.subscriptions enable row level security;
 alter table public.payments enable row level security;
+alter table public.connected_accounts enable row level security;
+alter table public.agent_action_drafts enable row level security;
+alter table public.agent_action_runs enable row level security;
 
 create policy "Users can read own profile"
 on public.profiles for select
@@ -112,6 +152,38 @@ with check (auth.uid() = user_id);
 create policy "Users can update own payments"
 on public.payments for update
 using (auth.uid() = user_id);
+
+create policy "Users can read own connected accounts"
+on public.connected_accounts for select
+using (auth.uid() = user_id);
+
+create policy "Users can insert own connected accounts"
+on public.connected_accounts for insert
+with check (auth.uid() = user_id);
+
+create policy "Users can update own connected accounts"
+on public.connected_accounts for update
+using (auth.uid() = user_id);
+
+create policy "Users can read own action drafts"
+on public.agent_action_drafts for select
+using (auth.uid() = user_id);
+
+create policy "Users can insert own action drafts"
+on public.agent_action_drafts for insert
+with check (auth.uid() = user_id);
+
+create policy "Users can update own action drafts"
+on public.agent_action_drafts for update
+using (auth.uid() = user_id);
+
+create policy "Users can read own action runs"
+on public.agent_action_runs for select
+using (auth.uid() = user_id);
+
+create policy "Users can insert own action runs"
+on public.agent_action_runs for insert
+with check (auth.uid() = user_id);
 
 create or replace function public.handle_new_user()
 returns trigger as $$

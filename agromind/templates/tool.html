@@ -377,6 +377,11 @@
               <span>📊</span> <span data-i18n="tool.exportPpt">Export PPT</span>
             </button>
           {% endif %}
+          {% if output_html and output_id %}
+            <button type="button" class="button secondary" onclick="startAgentAction('save_sheet', this)" style="padding: 4px 12px; font-size: 0.82rem; font-weight: 700; margin: 0; height: auto; border-radius: 6px;">Save Sheet</button>
+            <button type="button" class="button secondary" onclick="startAgentAction('send_gmail', this)" style="padding: 4px 12px; font-size: 0.82rem; font-weight: 700; margin: 0; height: auto; border-radius: 6px;">Gmail</button>
+            <button type="button" class="button secondary" onclick="startAgentAction('post_x', this)" style="padding: 4px 12px; font-size: 0.82rem; font-weight: 700; margin: 0; height: auto; border-radius: 6px;">X</button>
+          {% endif %}
           {% if output_html %}
             <button type="button" class="tts-speak-btn" onclick="speakText(document.getElementById('ai-output-text').innerText, this, null, '{{ response_language or default_language }}')">
               <span class="speaker-icon">🔊</span> <span class="btn-label" data-i18n="tool.listen">Listen</span>
@@ -849,6 +854,61 @@
       document.body.appendChild(form);
       form.submit();
       document.body.removeChild(form);
+    }
+
+    async function startAgentAction(actionType, btn) {
+      const outputId = "{{ output_id or '' }}";
+      if (!outputId) {
+        alert("This output was not saved yet, so an external action draft cannot be created.");
+        return;
+      }
+
+      const originalText = btn ? btn.textContent : "";
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Preparing...";
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append("csrf_token", "{{ csrf_token }}");
+        formData.append("output_id", outputId);
+        formData.append("action_type", actionType);
+
+        const draftResponse = await fetch("/api/agent-actions/draft", {
+          method: "POST",
+          body: formData
+        });
+        const draftData = await draftResponse.json();
+        if (!draftResponse.ok || !draftData.ok) {
+          throw new Error(draftData.detail || "Could not create action draft.");
+        }
+
+        const payloadPreview = JSON.stringify(draftData.draft.draft_payload, null, 2);
+        const approved = confirm(
+          `${draftData.label}\n\nReview this exact payload before approval:\n\n${payloadPreview}\n\nApprove and execute this action?`
+        );
+        if (!approved) return;
+
+        const approveForm = new FormData();
+        approveForm.append("csrf_token", "{{ csrf_token }}");
+        const approveResponse = await fetch(`/api/agent-actions/${draftData.draft.id}/approve`, {
+          method: "POST",
+          body: approveForm
+        });
+        const approveData = await approveResponse.json();
+        if (!approveResponse.ok || !approveData.ok) {
+          throw new Error(approveData.detail || "The connector could not execute this action.");
+        }
+        alert("Agent action executed successfully.");
+      } catch (err) {
+        alert(err.message || "Agent action failed.");
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = originalText;
+        }
+      }
     }
 
     // Initialization & Form binding on load

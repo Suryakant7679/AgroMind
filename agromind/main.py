@@ -18,6 +18,7 @@ from pptx import Presentation
 from pptx.util import Inches, Pt
 from starlette.middleware.sessions import SessionMiddleware
 
+from agromind.agent_actions import ACTION_CONFIG, create_draft_for_output, execute_approved_draft
 from agromind.ai import AIProviderError, generate_ai_response
 from agromind.billing import all_plans, can_use_plan, estimate_cost, estimate_prompt_tokens, get_plan
 from agromind.data import DOMAINS, all_tools, get_domain, get_tool
@@ -216,7 +217,7 @@ def tool_page(request: Request, domain_id: str, tool_id: str):
     tool = get_tool(domain_id, tool_id)
     if not domain or not tool:
         return RedirectResponse("/dashboard", status_code=303)
-    return page(request, "tool.html", domain=domain, tool=tool, output_html=None, fields={})
+    return page(request, "tool.html", domain=domain, tool=tool, output_html=None, fields={}, output_id=None)
 
 
 @app.post("/dashboard/{domain_id}/{tool_id}", response_class=HTMLResponse)
@@ -346,7 +347,7 @@ async def run_tool(
         output, provider, response_language = await generate_ai_response(domain_id, tool_id, fields, uploaded_asset, language_code, plan_id)
         output_tokens = max(1, len(output) // 4)
         billing = estimate_cost(provider, input_tokens, output_tokens)
-        save_output(
+        saved_output_id = save_output(
             user_or_response.get("id"),
             domain_id,
             tool_id,
@@ -364,16 +365,19 @@ async def run_tool(
         output_html = None
         response_language = language_code
         error = exc.user_message
+        saved_output_id = None
     except Exception as exc:
         output_html = None
         response_language = language_code
         error = str(exc)
+        saved_output_id = None
     return page(
         request,
         "tool.html",
         domain=domain,
         tool=tool,
         output_html=output_html,
+        output_id=saved_output_id,
         fields=fields,
         error=error,
         response_language=response_language,
@@ -1180,6 +1184,67 @@ async def get_history_detail(request: Request, output_id: str):
         "tokens_used": output.get("tokens_used", 0),
         "created_at": output.get("created_at"),
     }
+
+
+@app.post("/api/agent-actions/draft")
+async def create_agent_action_draft_api(
+    request: Request,
+    output_id: str = Form(...),
+    action_type: str = Form(...),
+    csrf_token: str = Form(...),
+):
+    user_or_response = require_user(request)
+    if isinstance(user_or_response, RedirectResponse):
+        raise HTTPException(status_code=401, detail="Login required.")
+    verify_csrf(request, csrf_token)
+
+    try:
+        draft = create_draft_for_output(
+            user_id=user_or_response.get("id"),
+            user_email=user_or_response.get("email", ""),
+            output_id=output_id,
+            action_type=action_type,
+            access_token=user_or_response.get("access_token"),
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return {
+        "ok": True,
+        "draft": draft,
+        "label": ACTION_CONFIG[action_type]["label"],
+    }
+
+
+@app.post("/api/agent-actions/{draft_id}/approve")
+async def approve_agent_action_draft_api(
+    request: Request,
+    draft_id: str,
+    csrf_token: str = Form(...),
+):
+    user_or_response = require_user(request)
+    if isinstance(user_or_response, RedirectResponse):
+        raise HTTPException(status_code=401, detail="Login required.")
+    verify_csrf(request, csrf_token)
+
+    try:
+        result = execute_approved_draft(
+            user_id=user_or_response.get("id"),
+            draft_id=draft_id,
+            access_token=user_or_response.get("access_token"),
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {"ok": True, "result": result}
 
 
 @app.post("/api/export/report")

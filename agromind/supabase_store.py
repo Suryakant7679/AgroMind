@@ -1,4 +1,5 @@
 import os
+import uuid
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from urllib.parse import quote
@@ -496,9 +497,11 @@ def save_output(
     credits_used: int = 0,
     cost_cents: int = 0,
     access_token: str | None = None,
-) -> None:
+) -> str | None:
     tokens_used = max(1, input_tokens + (len(output) // 4))
+    output_id = str(uuid.uuid4())
     output_row = {
+        "id": output_id,
         "user_id": user_id,
         "domain": domain_id,
         "tool": tool_id,
@@ -515,15 +518,17 @@ def save_output(
         "credits_used": credits_used,
         "cost_cents": cost_cents,
     }
+    output_saved = False
     client = supabase_client()
     if client and _can_use_python_client(access_token):
         try:
             client.table("ai_outputs").insert(output_row).execute()
+            output_saved = True
         except Exception:
             pass
         try:
             client.table("usage_events").insert(usage_row).execute()
-            return
+            return output_id if output_saved else None
         except Exception:
             # Fallback if credits_used does not exist in the live database table
             if "credits_used" in usage_row:
@@ -531,7 +536,7 @@ def save_output(
                 cleaned_row.pop("credits_used", None)
                 try:
                     client.table("usage_events").insert(cleaned_row).execute()
-                    return
+                    return output_id if output_saved else None
                 except Exception:
                     pass
             pass
@@ -542,6 +547,7 @@ def save_output(
     try:
         r1 = httpx.post(_rest_url("ai_outputs"), headers=_rest_headers(key, access_token), json=output_row, timeout=20)
         r1.raise_for_status()
+        output_saved = True
     except Exception as exc:
         print(f"Error saving to ai_outputs via REST: {exc}")
         if 'r1' in locals():
@@ -563,6 +569,123 @@ def save_output(
             print(f"Error saving to usage_events via REST: {exc}")
             if 'r2' in locals():
                 print(f"usage_events error response: {r2.status_code} - {r2.text}")
+    return output_id if output_saved else None
+
+
+def create_agent_action_draft(
+    user_id: str,
+    source_output_id: str,
+    action_type: str,
+    provider: str,
+    draft_payload: dict,
+    access_token: str | None = None,
+) -> dict | None:
+    row = {
+        "user_id": user_id,
+        "source_output_id": source_output_id,
+        "action_type": action_type,
+        "provider": provider,
+        "draft_payload": draft_payload,
+        "status": "pending",
+    }
+    client = supabase_client()
+    if client and _can_use_python_client(access_token):
+        try:
+            return client.table("agent_action_drafts").insert(row).execute().data[0]
+        except Exception:
+            pass
+
+    key = _database_key()
+    if not key:
+        return None
+    try:
+        response = httpx.post(_rest_url("agent_action_drafts"), headers=_rest_headers(key, access_token), json=row, timeout=20)
+        return response.json()[0] if response.status_code < 400 and response.json() else None
+    except Exception:
+        return None
+
+
+def fetch_agent_action_draft(draft_id: str, access_token: str | None = None) -> dict | None:
+    client = supabase_client()
+    if client and _can_use_python_client(access_token):
+        try:
+            return client.table("agent_action_drafts").select("*").eq("id", draft_id).single().execute().data
+        except Exception:
+            pass
+
+    key = _database_key()
+    if not key:
+        return None
+    try:
+        response = httpx.get(
+            _rest_url("agent_action_drafts", f"select=*&id=eq.{quote(draft_id)}&limit=1"),
+            headers=_rest_headers(key, access_token),
+            timeout=20,
+        )
+        rows = response.json() if response.status_code < 400 else []
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+
+def update_agent_action_draft(draft_id: str, values: dict, access_token: str | None = None) -> dict | None:
+    row = {**values, "updated_at": datetime.now(UTC).isoformat()}
+    client = supabase_client()
+    if client and _can_use_python_client(access_token):
+        try:
+            data = client.table("agent_action_drafts").update(row).eq("id", draft_id).execute().data
+            return data[0] if data else None
+        except Exception:
+            pass
+
+    key = _database_key()
+    if not key:
+        return None
+    try:
+        response = httpx.patch(
+            _rest_url("agent_action_drafts", f"id=eq.{quote(draft_id)}"),
+            headers=_rest_headers(key, access_token),
+            json=row,
+            timeout=20,
+        )
+        rows = response.json() if response.status_code < 400 else []
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+
+def save_agent_action_run(
+    draft_id: str,
+    user_id: str,
+    provider: str,
+    status: str,
+    result: dict | None = None,
+    error: str | None = None,
+    access_token: str | None = None,
+) -> None:
+    row = {
+        "draft_id": draft_id,
+        "user_id": user_id,
+        "provider": provider,
+        "status": status,
+        "result": result or {},
+        "error": error,
+    }
+    client = supabase_client()
+    if client and _can_use_python_client(access_token):
+        try:
+            client.table("agent_action_runs").insert(row).execute()
+            return
+        except Exception:
+            pass
+
+    key = _database_key()
+    if not key:
+        return
+    try:
+        httpx.post(_rest_url("agent_action_runs"), headers=_rest_headers(key, access_token), json=row, timeout=20)
+    except Exception:
+        pass
 
 
 def fetch_recent_outputs(user_id: str | None = None, limit: int = 5, access_token: str | None = None) -> list[dict]:
