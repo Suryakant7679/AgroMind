@@ -688,6 +688,87 @@ def save_agent_action_run(
         pass
 
 
+def fetch_agent_memory(
+    user_id: str | None,
+    agent: str,
+    session_id: str,
+    limit: int = 20,
+    access_token: str | None = None,
+) -> list[dict]:
+    if not user_id:
+        return []
+    client = supabase_client()
+    if client and _can_use_python_client(access_token):
+        try:
+            rows = (
+                client.table("agent_memory")
+                .select("role,content,created_at")
+                .eq("user_id", user_id)
+                .eq("agent", agent)
+                .eq("session_id", session_id)
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+                .data
+                or []
+            )
+            return list(reversed(rows))
+        except Exception:
+            pass
+
+    key = _database_key()
+    if not key:
+        return []
+    params = (
+        "select=role,content,created_at"
+        f"&user_id=eq.{quote(user_id)}"
+        f"&agent=eq.{quote(agent)}"
+        f"&session_id=eq.{quote(session_id)}"
+        "&order=created_at.desc"
+        f"&limit={limit}"
+    )
+    try:
+        response = httpx.get(_rest_url("agent_memory", params), headers=_rest_headers(key, access_token), timeout=20)
+        rows = response.json() if response.status_code < 400 else []
+        return list(reversed(rows))
+    except Exception:
+        return []
+
+
+def save_agent_memory(
+    user_id: str | None,
+    agent: str,
+    session_id: str,
+    role: str,
+    content: str,
+    access_token: str | None = None,
+) -> None:
+    if not user_id:
+        return
+    row = {
+        "user_id": user_id,
+        "agent": agent,
+        "session_id": session_id,
+        "role": role,
+        "content": content,
+    }
+    client = supabase_client()
+    if client and _can_use_python_client(access_token):
+        try:
+            client.table("agent_memory").insert(row).execute()
+            return
+        except Exception:
+            pass
+
+    key = _database_key()
+    if not key:
+        return
+    try:
+        httpx.post(_rest_url("agent_memory"), headers=_rest_headers(key, access_token), json=row, timeout=20)
+    except Exception:
+        pass
+
+
 def fetch_recent_outputs(user_id: str | None = None, limit: int = 5, access_token: str | None = None) -> list[dict]:
     client = supabase_client()
     if client and _can_use_python_client(access_token):
