@@ -11,3 +11,5 @@ venv/
 
 *.log
 tests/
+experts/
+scratch/
