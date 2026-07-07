@@ -7,6 +7,14 @@ Legend:
 - [ ] Planned
 - [!] Use only after security review
 
+## Delivery Timeline
+
+| Status | Target | Estimated time | What must be completed |
+|---|---|---:|---|
+| [>] | Demo-ready MVP polish | 2-4 days | Fix visible bugs, test login/signup, polish `/agents`, verify core AI tools, clean docs, and confirm production deploys |
+| [ ] | Strong production version | 2-3 weeks | Add real external MCP/data integrations, approval workflows, monitoring, payment verification, admin diagnostics, and broader tests |
+| [ ] | Full serious product | 4-6 weeks | Harden agriculture, healthcare, and education agents with reliable data sources, compliance review, analytics, exports, and user support flows |
+
 ## Phase 1: Core Development MCP Servers
 
 | Status | MCP server | Purpose in AgroMind | Project status |
@@ -76,8 +84,11 @@ Legend:
 7. [>] Run `supabase/schema.sql` so `agent_memory` exists.
 8. [>] Add Playwright MCP in your local MCP client and test `/agents`.
 9. [x] Add lightweight SVG render MCP for real plot previews.
-10. [>] Add Manim/Matplotlib render MCP for advanced plot images/videos.
-11. [ ] Add Google Drive/Sheets/Gmail only after approval workflow review.
+10. [>] Polish current deployed MVP for demo readiness.
+11. [>] Add Manim/Matplotlib render MCP for advanced plot images/videos.
+12. [ ] Add Google Drive/Sheets/Gmail only after approval workflow review.
+13. [ ] Add real agriculture/health/education external MCP integrations one by one.
+14. [ ] Add monitoring, payment verification, admin diagnostics, and production hardening.
 
 ## Notes
 
