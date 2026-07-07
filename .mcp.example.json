@@ -49,6 +49,13 @@
         "-y",
         "@modelcontextprotocol/server-memory"
       ]
+    },
+    "agromind-agriculture": {
+      "command": "python",
+      "args": [
+        "-m",
+        "agromind.mcp_servers.agriculture"
+      ]
     }
   }
 }

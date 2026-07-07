@@ -9,6 +9,8 @@ This project is now a good fit for MCP-assisted development because it has:
 
 Do not commit real tokens or personal MCP client files. Use `.mcp.example.json` as a template only.
 
+For the implementation checklist with tick marks, see `docs/mcp-roadmap.md`.
+
 ## Recommended Servers
 
 ### 1. Supabase MCP
@@ -149,6 +151,21 @@ Useful for the development assistant's long-running project notes. This is separ
 }
 ```
 
+### 8. AgroMind Agriculture MCP
+
+Local project MCP server for agriculture agents. It starts with environmental context, crop calendar guidance, and mandi-price guidance.
+
+```json
+{
+  "mcpServers": {
+    "agromind-agriculture": {
+      "command": "python",
+      "args": ["-m", "agromind.mcp_servers.agriculture"]
+    }
+  }
+}
+```
+
 ## Suggested Priority
 
 1. Supabase MCP, read-only and project-scoped.
@@ -157,6 +174,7 @@ Useful for the development assistant's long-running project notes. This is separ
 4. Filesystem and Git MCP for local code context if your MCP client lacks native repo access.
 5. Fetch MCP for documentation.
 6. Memory MCP for assistant continuity.
+7. AgroMind Agriculture MCP for Farmer Agent domain tools.
 
 ## Security Rules For This Project
 
