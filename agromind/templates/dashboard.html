@@ -22,13 +22,6 @@
     <div class="usage-meter-head"><strong data-i18n="dashboard.monthlyUsage">Monthly token usage</strong><span>{{ "{:,}".format(token_used) }} / {{ "{:,}".format(token_limit) }}</span></div>
     <div class="usage-bar"><span style="width: {{ pct }}%"></span></div>
   </div>
-  <section style="margin-top:1.5rem">
-    <a class="card" href="/agents" style="display:block">
-      <span class="badge">Agent mode</span>
-      <h2 style="margin:0.75rem 0 0.35rem">AgroMind Agents</h2>
-      <p class="muted">Use Farmer, Doctor, and Tutor agents with conversation memory and automatic routing.</p>
-    </a>
-  </section>
   {% for domain in domains %}
     <section style="margin-top:1.5rem">
       <h2 data-i18n="domain.{{ domain.id }}.name">{{ domain.name }}</h2>

@@ -18,8 +18,6 @@ from pptx import Presentation
 from pptx.util import Inches, Pt
 from starlette.middleware.sessions import SessionMiddleware
 
-from agromind.agent_actions import ACTION_CONFIG, create_draft_for_output, execute_approved_draft
-from agromind.agents import AgentChatRequest, AgentOrchestrator
 from agromind.ai import AIProviderError, generate_ai_response
 from agromind.billing import all_plans, can_use_plan, estimate_cost, estimate_prompt_tokens, get_plan
 from agromind.chatbot import WorkspaceChatRequest, WorkspaceChatbot
@@ -82,7 +80,6 @@ app = FastAPI(title="AgroMind AI")
 app.add_middleware(SessionMiddleware, secret_key=session_secret, https_only=os.getenv("ENVIRONMENT", "").lower() == "production")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
-agent_orchestrator = AgentOrchestrator()
 workspace_chatbot = WorkspaceChatbot()
 
 # Configure and ensure secure upload directory exists (handle read-only serverless filesystems gracefully)
@@ -100,18 +97,6 @@ except Exception as e:
 @app.get("/api/health")
 def health_check():
     return {"ok": True, "service": "agromind"}
-
-
-@app.post("/api/agents/chat")
-async def agent_chat(request: Request, payload: AgentChatRequest):
-    user_or_response = require_user(request)
-    if isinstance(user_or_response, RedirectResponse):
-        raise HTTPException(status_code=401, detail="Login required.")
-    return await agent_orchestrator.reply(
-        payload,
-        user_id=user_or_response.get("id"),
-        access_token=user_or_response.get("access_token"),
-    )
 
 
 @app.post("/api/chatbot/chat")
@@ -228,14 +213,6 @@ def dashboard(request: Request):
     plan = get_plan(profile_data.get("plan", "starter"))
     usage = usage_summary(user_or_response.get("id"), user_or_response.get("access_token"))
     return page(request, "dashboard.html", tools=all_tools(), recent=enriched_recent, usage=usage, current_plan=plan)
-
-
-@app.get("/agents", response_class=HTMLResponse)
-def agents_page(request: Request):
-    user_or_response = require_user(request)
-    if isinstance(user_or_response, RedirectResponse):
-        return user_or_response
-    return page(request, "agents.html")
 
 
 @app.get("/chatbot", response_class=HTMLResponse)
@@ -1218,67 +1195,6 @@ async def get_history_detail(request: Request, output_id: str):
         "tokens_used": output.get("tokens_used", 0),
         "created_at": output.get("created_at"),
     }
-
-
-@app.post("/api/agent-actions/draft")
-async def create_agent_action_draft_api(
-    request: Request,
-    output_id: str = Form(...),
-    action_type: str = Form(...),
-    csrf_token: str = Form(...),
-):
-    user_or_response = require_user(request)
-    if isinstance(user_or_response, RedirectResponse):
-        raise HTTPException(status_code=401, detail="Login required.")
-    verify_csrf(request, csrf_token)
-
-    try:
-        draft = create_draft_for_output(
-            user_id=user_or_response.get("id"),
-            user_email=user_or_response.get("email", ""),
-            output_id=output_id,
-            action_type=action_type,
-            access_token=user_or_response.get("access_token"),
-        )
-    except PermissionError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-    return {
-        "ok": True,
-        "draft": draft,
-        "label": ACTION_CONFIG[action_type]["label"],
-    }
-
-
-@app.post("/api/agent-actions/{draft_id}/approve")
-async def approve_agent_action_draft_api(
-    request: Request,
-    draft_id: str,
-    csrf_token: str = Form(...),
-):
-    user_or_response = require_user(request)
-    if isinstance(user_or_response, RedirectResponse):
-        raise HTTPException(status_code=401, detail="Login required.")
-    verify_csrf(request, csrf_token)
-
-    try:
-        result = execute_approved_draft(
-            user_id=user_or_response.get("id"),
-            draft_id=draft_id,
-            access_token=user_or_response.get("access_token"),
-        )
-    except PermissionError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    return {"ok": True, "result": result}
 
 
 @app.post("/api/export/report")

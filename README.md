@@ -135,12 +135,6 @@ ALLOW_DEMO_LOGIN=false
 
 In production, the app refuses to start with the default development session secret.
 
-## MCP-Assisted Development
-
-Recommended MCP servers and safe client templates are documented in `docs/mcp-setup.md`.
-The step-by-step MCP roadmap with tick marks is in `docs/mcp-roadmap.md`.
-Start with Supabase MCP in project-scoped read-only mode, then add Playwright MCP for UI testing and GitHub MCP for deployment context.
-
 ## Main Routes
 
 ```txt
@@ -148,7 +142,6 @@ Start with Supabase MCP in project-scoped read-only mode, then add Playwright MC
 /dashboard                Tool dashboard
 /dashboard/{domain}       Domain page
 /dashboard/{domain}/{tool} Tool workbench
-/agents                   Domain agent chat
 /chatbot                  Workspace chatbot with recent tool/output context
 /analytics                Analytics
 /admin                    Admin
@@ -160,31 +153,7 @@ Start with Supabase MCP in project-scoped read-only mode, then add Playwright MC
 /api/usage                JSON usage endpoint
 /api/export/report        Export hook
 /api/ppt                  PPTX generator
-/api/agent-actions/draft  Create a reviewable external-action draft
-/api/agent-actions/{id}/approve Execute a user-approved external action
 ```
-
-## Agent Actions
-
-Generated tool outputs can now create approval-based action drafts for:
-
-- saving a result to Google Sheets
-- preparing a Gmail send
-- preparing an X post
-
-The app stores drafts and execution logs in Supabase before any external write is attempted. Run the updated `supabase/schema.sql` to add:
-
-- `connected_accounts`
-- `agent_action_drafts`
-- `agent_action_runs`
-
-For a quick Google Sheets integration, set:
-
-```bash
-GOOGLE_SHEETS_WEBHOOK_URL=
-```
-
-to a Google Apps Script web app URL that appends the incoming JSON payload to your target sheet. Gmail and X adapters are scaffolded for OAuth-backed execution and intentionally refuse to send/post until user-token storage is connected.
 
 ## Notes
 
