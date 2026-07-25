@@ -103,6 +103,29 @@ Open:
 http://127.0.0.1:8000
 ```
 
+
+### Integrated AI Tutor chatbot
+
+AgroMind can embed the independent `AI tutor` project without copying or
+modifying it. Set:
+
+```txt
+AI_TUTOR_ROOT=../AI tutor
+AI_TUTOR_URL=http://127.0.0.1:8010
+```
+
+Then launch both applications:
+
+```bash
+python run_integrated.py
+```
+
+AgroMind runs on port `8000` and AI Tutor runs on port `8010`. Because AgroMind
+loads the separately running AI Tutor service, changes made in the AI Tutor
+project are reflected after its server is restarted. Configure `DATABASE_URL`
+and `AIOS_STORAGE_BACKEND=postgres` in AI Tutor itself; AgroMind continues to
+use Supabase for its own authentication and application data.
+
 ## Production
 
 The project is configured for Vercel with:

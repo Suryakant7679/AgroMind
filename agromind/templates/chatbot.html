@@ -1,6 +1,21 @@
 {% extends "base.html" %}
 {% block content %}
   <style>
+    .ai-tutor-frame {
+      width: 100%;
+      height: calc(100vh - 9rem);
+      min-height: 42rem;
+      border: 1px solid var(--line);
+      border-radius: 0.75rem;
+      background: #fff;
+    }
+    .ai-tutor-notice {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+    }
     .chatbot-shell {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 18rem;
@@ -73,6 +88,22 @@
     }
   </style>
 
+  {% if ai_tutor_enabled %}
+  <div class="ai-tutor-notice">
+    <div>
+      <h1 class="page-title">AI Tutor Chatbot</h1>
+      <p class="muted">Live from the independent AI Tutor project with PostgreSQL conversation storage.</p>
+    </div>
+    <a class="button secondary" href="{{ ai_tutor_url }}" target="_blank" rel="noopener">Open separately</a>
+  </div>
+  <iframe
+    class="ai-tutor-frame"
+    src="{{ ai_tutor_url }}"
+    title="AI Tutor Chatbot"
+    allow="microphone"
+    referrerpolicy="same-origin"
+  ></iframe>
+  {% else %}
   <h1 class="page-title">Workspace Chatbot</h1>
   <p class="muted">A separate chatbot that understands your recent AgroMind tool usage, saved outputs, and ongoing workspace context.</p>
 
@@ -165,4 +196,5 @@
       }
     }
   </script>
+  {% endif %}
 {% endblock %}

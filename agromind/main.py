@@ -220,7 +220,13 @@ def chatbot_page(request: Request):
     user_or_response = require_user(request)
     if isinstance(user_or_response, RedirectResponse):
         return user_or_response
-    return page(request, "chatbot.html")
+    ai_tutor_url = os.getenv("AI_TUTOR_URL", "").strip().rstrip("/")
+    return page(
+        request,
+        "chatbot.html",
+        ai_tutor_url=ai_tutor_url,
+        ai_tutor_enabled=bool(ai_tutor_url),
+    )
 
 
 @app.get("/dashboard/{domain_id}", response_class=HTMLResponse)

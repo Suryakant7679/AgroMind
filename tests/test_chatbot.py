@@ -20,8 +20,8 @@ def test_chatbot_page_renders_for_authenticated_user(monkeypatch):
         response = test_client.get("/chatbot")
 
     assert response.status_code == 200
-    assert "Workspace Chatbot" in response.text
-    assert "recent AgroMind tool usage" in response.text
+    assert "AI Tutor Chatbot" in response.text
+    assert "http://127.0.0.1:8010" in response.text
 
 
 def test_chatbot_api_requires_login():
