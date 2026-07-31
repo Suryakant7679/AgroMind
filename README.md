@@ -104,27 +104,31 @@ http://127.0.0.1:8000
 ```
 
 
-### Integrated AI Tutor chatbot
+### Hosted AI Tutor chatbot
 
-AgroMind can embed the independent `AI tutor` project without copying or
-modifying it. Set:
+AgroMind embeds the deployed AI Tutor frontend in its authenticated chatbot
+page. Set:
 
 ```txt
-AI_TUTOR_ROOT=../AI tutor
-AI_TUTOR_URL=http://127.0.0.1:8010
+AI_TUTOR_URL=https://ai-tutor-eta-ochre.vercel.app
 ```
 
-Then launch both applications:
+The deployed services are:
+
+- Frontend: `https://ai-tutor-eta-ochre.vercel.app`
+- Backend: `https://ai-tutor-backend-gc7m.onrender.com`
+- Health check: `https://ai-tutor-eta-ochre.vercel.app/api/v1/health`
+
+Only AgroMind needs to be launched locally:
 
 ```bash
-python run_integrated.py
+python run.py
 ```
 
-AgroMind runs on port `8000` and AI Tutor runs on port `8010`. Because AgroMind
-loads the separately running AI Tutor service, changes made in the AI Tutor
-project are reflected after its server is restarted. Configure `DATABASE_URL`
-and `AIOS_STORAGE_BACKEND=postgres` in AI Tutor itself; AgroMind continues to
-use Supabase for its own authentication and application data.
+`run_integrated.py` remains available as an optional local-development workflow.
+Set `AI_TUTOR_ROOT` and use a local `AI_TUTOR_URL` when testing both repositories
+together. AgroMind continues to use Supabase for its own authentication and
+application data.
 
 ## Production
 

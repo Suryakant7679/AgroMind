@@ -81,6 +81,7 @@ app.add_middleware(SessionMiddleware, secret_key=session_secret, https_only=os.g
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 workspace_chatbot = WorkspaceChatbot()
+DEFAULT_AI_TUTOR_URL = "https://ai-tutor-eta-ochre.vercel.app"
 
 # Configure and ensure secure upload directory exists (handle read-only serverless filesystems gracefully)
 UPLOADS_DIR = BASE_DIR / "static" / "uploads"
@@ -220,7 +221,7 @@ def chatbot_page(request: Request):
     user_or_response = require_user(request)
     if isinstance(user_or_response, RedirectResponse):
         return user_or_response
-    ai_tutor_url = os.getenv("AI_TUTOR_URL", "").strip().rstrip("/")
+    ai_tutor_url = os.getenv("AI_TUTOR_URL", DEFAULT_AI_TUTOR_URL).strip().rstrip("/")
     return page(
         request,
         "chatbot.html",

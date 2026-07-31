@@ -15,13 +15,14 @@ def test_chatbot_page_requires_login():
 
 def test_chatbot_page_renders_for_authenticated_user(monkeypatch):
     monkeypatch.setattr(main, "user_from_session", lambda request: {"id": "user-1", "email": "u@example.com"})
+    monkeypatch.delenv("AI_TUTOR_URL", raising=False)
 
     with TestClient(main.app) as test_client:
         response = test_client.get("/chatbot")
 
     assert response.status_code == 200
     assert "AI Tutor Chatbot" in response.text
-    assert "http://127.0.0.1:8010" in response.text
+    assert "https://ai-tutor-eta-ochre.vercel.app" in response.text
 
 
 def test_chatbot_api_requires_login():
