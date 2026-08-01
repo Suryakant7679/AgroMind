@@ -2,9 +2,11 @@
 {% block content %}
   <style>
     .ai-tutor-frame {
-      width: 100%;
-      height: calc(100vh - 9rem);
-      min-height: 42rem;
+      display: block;
+      width: min(100%, 60rem);
+      height: auto;
+      aspect-ratio: 20 / 15;
+      margin: 0 auto;
       border: 1px solid var(--line);
       border-radius: 0.75rem;
       background: #fff;
@@ -14,6 +16,9 @@
       align-items: center;
       justify-content: space-between;
       gap: 1rem;
+      width: min(100%, 60rem);
+      margin-left: auto;
+      margin-right: auto;
       margin-bottom: 0.75rem;
     }
     .chatbot-shell {
@@ -84,6 +89,12 @@
       }
       .chatbot-panel {
         min-height: 34rem;
+      }
+    }
+    @media (max-width: 560px) {
+      .ai-tutor-notice {
+        align-items: flex-start;
+        flex-direction: column;
       }
     }
   </style>
