@@ -146,8 +146,9 @@ For scheduled jobs, start a worker and scheduler in separate terminals:
 Workers require Redis. Use a shared Chroma server when running multiple processes.
 
 The Docker image includes both AgroMind and AI Tutor, with PostgreSQL, Redis,
-ChromaDB, and workers managed by Compose. Follow [Docker setup](docs/DEPLOYMENT.md)
-to configure `.env.docker`, then run:
+ChromaDB, and workers managed by Compose. Copy `.env.docker.example` to
+`.env.docker` if needed, replace its placeholder secrets, add your model API key,
+then run:
 
 ```powershell
 docker compose --env-file .env.docker up -d --build
@@ -209,9 +210,6 @@ Tests cover application behavior, authentication, retrieval, streaming, and tool
 They do not establish live provider availability or production-scale performance.
 
 - [Detailed setup](SETUP.md)
-- [Local Docker setup](docs/DEPLOYMENT.md)
-- [Known issues and audit](docs/BUG_AUDIT.md)
-- [MCP development tools](docs/MCP_SETUP.md)
 
 ## License
 

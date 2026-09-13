@@ -226,8 +226,7 @@ Uploaded files and metadata remain in their existing locations.
 
 ## Local application
 
-Python serves both the frontend and API on localhost. See [README](readme.md)
-and [local infrastructure](docs/DEPLOYMENT.md) for complete startup instructions.
+Python serves both the frontend and API on localhost. See [README](readme.md) for complete startup instructions.
 
 ## Local Docker stack
 
