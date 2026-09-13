@@ -113,6 +113,10 @@ The launcher waits for AI Tutor to start and stops the child process when you ex
 With `AIOS_HOST=127.0.0.1` and `AIOS_PORT=8000`, open **http://127.0.0.1:8000**.
 The same process serves the frontend and API; no frontend build is needed.
 
+If another application uses port 8000, set `$env:AGROMIND_PORT="8080"` before
+running `run_integrated.py`, then open http://127.0.0.1:8080.
+Use `AI_TUTOR_PORT` to change the tutor port if needed.
+
 Choose one startup option at a time to avoid port conflicts. Use **Ctrl+C** to stop.
 Model APIs, web search, CDN assets, and hosted Supabase still need internet access.
 

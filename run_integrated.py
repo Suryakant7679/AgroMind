@@ -35,11 +35,15 @@ def main() -> None:
         )
     import socket
     tutor_port = int(os.getenv("AI_TUTOR_PORT", "8010"))
-    if not 1 <= tutor_port <= 65535 or tutor_port == 8000:
-        raise ValueError("AI_TUTOR_PORT must be valid and different from AgroMind port 8000.")
-    for port in (8000, tutor_port):
+    portal_port = int(os.getenv("AGROMIND_PORT", "8000"))
+    if not all(1 <= port <= 65535 for port in (tutor_port, portal_port)) or tutor_port == portal_port:
+        raise ValueError("AI_TUTOR_PORT and AGROMIND_PORT must be distinct ports between 1 and 65535.")
+    for port in (portal_port, tutor_port):
         with socket.socket() as probe:
-            probe.bind(("127.0.0.1", port))
+            try:
+                probe.bind(("127.0.0.1", port))
+            except OSError as exc:
+                raise RuntimeError(f"Port {port} is already in use. Set AGROMIND_PORT and AI_TUTOR_PORT to free ports.") from exc
     tutor_env = os.environ.copy()
     tutor_env["AIOS_HOST"] = "127.0.0.1"
     tutor_env["AIOS_PORT"] = str(tutor_port)
@@ -74,7 +78,8 @@ def main() -> None:
             if time.monotonic() >= deadline:
                 raise RuntimeError("AI Tutor startup timed out; check its database connections.")
             time.sleep(0.2)
-        uvicorn.run("agromind.main:app", host="127.0.0.1", port=8000)
+        print(f"AgroMind: http://127.0.0.1:{portal_port}; AI Tutor: {os.environ['AI_TUTOR_URL']}", flush=True)
+        uvicorn.run("agromind.main:app", host="127.0.0.1", port=portal_port)
     finally:
         tutor_process.terminate()
         try:
