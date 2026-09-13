@@ -47,7 +47,7 @@ def test_login_rejects_bad_csrf():
 
 
 def test_signup_creates_confirmed_user_and_signs_in(monkeypatch):
-    monkeypatch.setattr(main, "supabase_auth_configured", lambda: True)
+    monkeypatch.setattr(main, "postgres_auth_configured", lambda: True)
     monkeypatch.setattr(main, "create_confirmed_user_with_password", lambda email, password, full_name: {"id": "user-1", "email": email})
     monkeypatch.setattr(main, "insert_profile_if_missing", lambda user_id, email, full_name: None)
     monkeypatch.setattr(main, "sign_in_with_password", lambda email, password: {"id": "user-1", "email": email, "access_token": "token"})
@@ -72,7 +72,7 @@ def test_signup_creates_confirmed_user_and_signs_in(monkeypatch):
 
 
 def test_signup_page_does_not_show_email_or_otp_verification_options(monkeypatch):
-    monkeypatch.setattr(main, "supabase_auth_configured", lambda: True)
+    monkeypatch.setattr(main, "postgres_auth_configured", lambda: True)
 
     with client() as test_client:
         response = test_client.get("/signup")

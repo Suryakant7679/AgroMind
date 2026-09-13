@@ -120,7 +120,7 @@ The provider keys are not configured yet, so this response shows the expected re
 - The final response will follow the required structure for {hints}.
 
 ### Next Steps
-1. Configure Supabase and AI provider keys.
+1. Configure PostgreSQL and AI provider keys.
 2. Run the tool again with realistic inputs and an uploaded file when needed.
 3. Export the report or generate a PPT from the dashboard.
 """

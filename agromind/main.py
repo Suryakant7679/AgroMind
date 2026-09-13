@@ -31,7 +31,7 @@ from agromind.models import (
     language_options,
     resolve_response_language,
 )
-from agromind.supabase_store import (
+from agromind.postgres_store import (
     create_confirmed_user_with_password,
     fetch_profile,
     fetch_profiles,
@@ -43,31 +43,18 @@ from agromind.supabase_store import (
     save_output,
     save_subscription,
     sign_in_with_password,
-    supabase_auth_configured,
-    supabase_client,
-    supabase_database_configured,
+    postgres_auth_configured,
+    postgres_database_configured,
     update_profile_plan,
     update_profile,
     update_user_password,
     usage_summary,
-    verify_email_token_hash,
-    verify_signup_otp,
+    session_user,
+    revoke_session,
 )
 
 load_dotenv(".env.local")
 load_dotenv()
-
-# Clean environment variables of spaces/quotes
-for env_key in [
-    "NEXT_PUBLIC_SUPABASE_URL",
-    "SUPABASE_URL",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    "SUPABASE_ANON_KEY",
-    "SUPABASE_SERVICE_ROLE_KEY"
-]:
-    env_val = os.getenv(env_key)
-    if env_val:
-        os.environ[env_key] = env_val.strip().strip("'\"")
 
 SERVER_START_TIME = time.time()
 DEFAULT_DEV_SECRET = "agromind-dev-secret"
@@ -113,7 +100,8 @@ async def workspace_chat(request: Request, payload: WorkspaceChatRequest):
 
 
 def user_from_session(request: Request) -> dict | None:
-    return request.session.get("user")
+    user = request.session.get("user") or {}
+    return session_user(user.get("access_token"))
 
 
 def csrf_token(request: Request) -> str:
@@ -515,8 +503,8 @@ def settings(request: Request):
     if isinstance(user_or_response, RedirectResponse):
         return user_or_response
     configured = {
-        "supabase_auth": supabase_auth_configured(),
-        "supabase_database": supabase_database_configured(),
+        "postgres_auth": postgres_auth_configured(),
+        "postgres_database": postgres_database_configured(),
         "gemini": bool(os.getenv("GEMINI_API_KEY")),
         "groq": bool(os.getenv("GROQ_API_KEY")),
     }
@@ -553,7 +541,7 @@ async def login_submit(
 ):
     verify_csrf(request, csrf_token)
     next = safe_next(next)
-    if supabase_auth_configured():
+    if postgres_auth_configured():
         if not password:
             return page(request, "login.html", next=next, message="Password is required.")
         try:
@@ -569,15 +557,11 @@ async def login_submit(
                 error_msg = f"Login failed: {error_msg}"
             return page(request, "login.html", next=next, message=error_msg)
 
-    if os.getenv("ALLOW_DEMO_LOGIN", "").lower() == "true":
-        request.session["user"] = {"id": None, "email": email}
-        return RedirectResponse(next, status_code=303)
-
     return page(
         request,
         "login.html",
         next=next,
-        message="Authentication is not configured. Add valid Supabase URL and anon key before signing in.",
+        message="Authentication is not configured. Set DATABASE_URL in .env before signing in.",
     )
 
 
@@ -610,8 +594,8 @@ async def signup_submit(
     if len(password) < 6:
         return page(request, "signup.html", next=next, message="Password must be at least 6 characters.")
 
-    if not supabase_auth_configured():
-        return page(request, "signup.html", next=next, message="Supabase auth is not configured.")
+    if not postgres_auth_configured():
+        return page(request, "signup.html", next=next, message="Set DATABASE_URL in .env to enable PostgreSQL signup.")
 
     try:
         return complete_confirmed_signup(request, email, password, full_name, next)
@@ -619,110 +603,17 @@ async def signup_submit(
         return page(request, "signup.html", next=next, message=str(exc))
 
 
-@app.get("/check-email", response_class=HTMLResponse)
-def check_email_page(request: Request):
-    email = request.session.get("signup_email", "")
-    next_dest = request.session.get("signup_next", "/dashboard")
-    return page(
-        request,
-        "verify_otp.html",
-        email=email,
-        next=next_dest,
-        mode="link",
-        message=None,
-    )
-
-
-@app.get("/verify-otp", response_class=HTMLResponse)
-def verify_otp_page(request: Request):
-    email = request.session.get("signup_email", "")
-    next_dest = request.session.get("signup_next", "/dashboard")
-    return page(request, "verify_otp.html", email=email, next=next_dest, mode="otp", message=None)
-
-
-@app.post("/verify-otp", response_class=HTMLResponse)
-async def verify_otp_submit(
-    request: Request,
-    email: str = Form(...),
-    token: str = Form(...),
-    csrf_token: str = Form(...),
-    next: str = Form("/dashboard"),
-):
-    verify_csrf(request, csrf_token)
-    next = safe_next(next)
-    full_name = request.session.get("signup_full_name", "")
-    otp_type = request.session.get("signup_otp_type", "signup")
-    signup_password = request.session.get("signup_password", "")
-    try:
-        user = verify_signup_otp(email, token, otp_type)
-        if user.get("id") and user.get("email"):
-            # Set the password using their access token if they verified via OTP
-            if signup_password and user.get("access_token"):
-                update_user_password(user["access_token"], signup_password)
-
-            insert_profile_if_missing(user["id"], user["email"], full_name)
-            request.session["user"] = user
-            
-            # Clean up session
-            for key in ("signup_email", "signup_full_name", "signup_next",
-                        "signup_verification_method", "signup_otp_type", "signup_password"):
-                request.session.pop(key, None)
-                
-            return RedirectResponse(next, status_code=303)
-        else:
-            raise RuntimeError("Verification succeeded but did not return a valid user.")
-    except Exception as exc:
-        return page(request, "verify_otp.html", email=email, next=next, mode="otp", message=str(exc))
-
-
-@app.get("/auth/confirmed", response_class=HTMLResponse)
-def auth_confirmed(
-    request: Request,
-    next: str = "/dashboard",
-    error: str = "",
-    error_description: str = "",
-    token_hash: str = "",
-    type: str = "",
-):
-    next = safe_next(next)
-    if error or error_description:
-        message = error_description or error or "The confirmation link could not be verified. Please try signing up again."
-        return page(request, "login.html", next=next, message=message)
-
-    # Exchange the token_hash from the confirmation link for a real session
-    if token_hash and type:
-        try:
-            user = verify_email_token_hash(token_hash, type)
-            if user.get("id") and user.get("email"):
-                full_name = request.session.get("signup_full_name", "")
-                insert_profile_if_missing(user["id"], user["email"], full_name)
-                request.session["user"] = user
-                for key in ("signup_email", "signup_full_name", "signup_next",
-                            "signup_verification_method", "signup_otp_type"):
-                    request.session.pop(key, None)
-                return RedirectResponse(next, status_code=303)
-        except Exception as exc:
-            return page(
-                request, "login.html", next=next,
-                message=f"Could not verify email automatically: {exc}. Please log in with your password.",
-            )
-
-    # Fallback: no token params â€” ask user to log in manually
-    request.session.pop("signup_email", None)
-    request.session.pop("signup_full_name", None)
-    request.session.pop("signup_next", None)
-    request.session.pop("signup_verification_method", None)
-    request.session.pop("signup_otp_type", None)
-    return page(
-        request,
-        "login.html",
-        next=next,
-        message="Email confirmed successfully. Please log in with your email and password to continue.",
-    )
+# Old email-verification links now lead to password login.
+@app.get("/check-email")
+@app.get("/verify-otp")
+@app.get("/auth/confirmed")
+def legacy_auth_link():
+    return RedirectResponse("/login", status_code=303)
 
 
 @app.get("/logout")
 def logout(request: Request):
+    revoke_session((request.session.get("user") or {}).get("access_token"))
     request.session.clear()
     return RedirectResponse("/", status_code=303)
 
@@ -778,10 +669,10 @@ def system_monitor(request: Request):
             "status": "configured" if os.getenv("PLANT_ID_API_KEY") else "missing (Gemini vision active)",
             "description": "Optional leaf analysis key. Falls back to highly-accurate Gemini vision diagnostic scanner if missing."
         },
-        "SUPABASE_URL": {
-            "name": "SUPABASE_URL",
+        "DATABASE_URL": {
+            "name": "DATABASE_URL",
             "type": "Required",
-            "status": "configured" if os.getenv("SUPABASE_URL") else "missing",
+            "status": "configured" if os.getenv("DATABASE_URL") else "missing",
             "description": "Required for farmer database sync, pricing plans, and dashboard profile audits."
         }
     }

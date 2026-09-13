@@ -6,7 +6,7 @@ from pathlib import Path
 
 _test_data = tempfile.TemporaryDirectory(prefix="ai-tutor-tests-")
 atexit.register(_test_data.cleanup)
-for key in ("DATABASE_URL", "REDIS_URL", "QDRANT_URL", "QDRANT_API_KEY", "OPENAI_API_KEY",
+for key in ("AGROMIND_DATABASE_URL", "DATABASE_URL", "REDIS_URL", "QDRANT_URL", "QDRANT_API_KEY", "OPENAI_API_KEY",
             "GROQ_API_KEY", "GEMINI_API_KEY", "DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY", "GITHUB_TOKEN",
             "AIOS_ADMIN_EMAILS", "AIOS_MCP_WORKSPACE_ROOT"):
     os.environ[key] = ""

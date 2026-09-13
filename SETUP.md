@@ -1,6 +1,12 @@
-# AIOS Starter Setup
+# Local setup
 
-This is the first working skeleton for the AIOS project.
+For the complete AgroMind portal and AI Tutor, follow [the README](readme.md#getting-started).
+Both use local PostgreSQL. Set `DATABASE_URL` and `AIOS_STORAGE_BACKEND=postgres`
+in `.env`, install both dependency sets, and start `python run_integrated.py`.
+AgroMind signup requires no hosted authentication service. Its tables are created
+automatically in the `agromind` schema; AI Tutor retains its own tables and login.
+
+The reference below covers additional AI Tutor settings.
 
 ## Run
 

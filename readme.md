@@ -35,8 +35,8 @@ Browser
         `-- External LLM APIs: answer generation
 ```
 
-AgroMind uses Supabase for its own authentication and data. AI Tutor supports local
-JSON storage as well as PostgreSQL. Its retrieval combines hash-based vectors,
+AgroMind and AI Tutor use PostgreSQL for accounts and application data. They keep
+separate accounts and tables in the same database. Its retrieval combines hash-based vectors,
 keyword matching, and reranking; it does not use a trained embedding model.
 
 ## Getting started
@@ -76,18 +76,32 @@ have a working setup.
 | `AIOS_PROVIDER` | Use `auto`, or your intended provider |
 | `AIOS_AUTH_REQUIRED` | Set to `true` to protect AI Tutor API requests |
 | `AIOS_JWT_SECRET` | Stable, random signing secret of at least 32 bytes |
-| `AIOS_STORAGE_BACKEND` | `postgres` for PostgreSQL or `json` for local file storage |
-| `DATABASE_URL` | AI Tutor's PostgreSQL connection, when selected |
+| `AIOS_STORAGE_BACKEND` | Set to `postgres` for this setup |
+| `DATABASE_URL` | PostgreSQL connection used by both applications |
 | `REDIS_URL` | Shared state and workers; required for background jobs |
 | `AIOS_VECTOR_BACKEND` | Set to `chroma` to use ChromaDB |
 | `AIOS_CHROMA_PATH` | Local Chroma data directory, such as `data/chroma` |
 | `CHROMA_HOST` / `CHROMA_PORT` | Shared Chroma server; leave the host blank for single-process embedded storage |
-| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | AgroMind authentication and database access |
+| `AGROMIND_DATABASE_URL` | Optional separate PostgreSQL database for AgroMind; defaults to `DATABASE_URL` |
 | `SESSION_SECRET` | AgroMind's session signing secret |
 
-AgroMind also accepts the existing `NEXT_PUBLIC_SUPABASE_*` aliases. Some
-administrative operations require `SUPABASE_SERVICE_ROLE_KEY`. Its database
-schema is in `supabase/schema.sql`; the launcher does not provision Supabase.
+Start PostgreSQL and create a database and application user, then set:
+
+```dotenv
+DATABASE_URL=postgresql://YOUR_USER:YOUR_PASSWORD@127.0.0.1:5432/YOUR_DATABASE
+AIOS_STORAGE_BACKEND=postgres
+SESSION_SECRET=replace-with-a-long-random-secret
+```
+
+Generate a session secret with `python -c "import secrets; print(secrets.token_hex(32))"`.
+AgroMind creates its tables from `agromind/schema.sql` on its first database access.
+The database user needs permission to create a schema and tables. AI Tutor runs its
+own migrations. Existing AI Tutor tables are preserved.
+
+AgroMind signup creates a local account immediately; no email verification service
+is required. Passwords are salted and hashed, and revocable sessions are stored in
+PostgreSQL. Previously hosted accounts and data are not copied automatically;
+create a local account to get started. The AI Tutor login remains separate.
 
 For native PDF extraction and OCR, install Poppler and Tesseract so `pdftotext`,
 `pdftoppm`, and `tesseract` are available on PATH. The Docker image includes them.
@@ -118,7 +132,7 @@ running `run_integrated.py`, then open http://127.0.0.1:8080.
 Use `AI_TUTOR_PORT` to change the tutor port if needed.
 
 Choose one startup option at a time to avoid port conflicts. Use **Ctrl+C** to stop.
-Model APIs, web search, CDN assets, and hosted Supabase still need internet access.
+Model APIs, web search, and CDN assets still need internet access.
 
 ## Background workers and Docker
 
@@ -157,13 +171,13 @@ Keep `.env` files, API keys, user uploads, and database credentials out of Git.
 ## Project structure
 
 ```text
-agromind/          FastAPI portal, domain tools, templates, and Supabase access
+agromind/          FastAPI portal, domain tools, templates, and PostgreSQL storage
 app/               AI Tutor backend, authentication, document processing, and retrieval
   agents/          LangGraph planning and specialist workflows
   mcp/             Search and other tool integrations
 web/               AI Tutor HTML, CSS, and JavaScript
 migrations/        AI Tutor PostgreSQL migrations
-supabase/          AgroMind database schema
+agromind/schema.sql AgroMind PostgreSQL tables
 tests/             Application and regression tests
 docs/              Setup, audit, and development notes
 scripts/           Backup, restore, and development utilities

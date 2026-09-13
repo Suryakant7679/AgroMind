@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 import agromind.main as main
-import agromind.supabase_store as store
+import agromind.postgres_store as store
 from agromind.chatbot import WorkspaceChatRequest, WorkspaceChatResponse, WorkspaceChatbot
 
 

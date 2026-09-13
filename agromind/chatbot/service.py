@@ -117,7 +117,7 @@ class WorkspaceChatbot:
         user_id: str | None,
         access_token: str | None = None,
     ) -> WorkspaceChatResponse:
-        from agromind.supabase_store import (
+        from agromind.postgres_store import (
             fetch_agent_memory,
             fetch_recent_outputs,
             save_agent_memory,
