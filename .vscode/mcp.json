@@ -1,0 +1,35 @@
+{
+  "servers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/node_modules/@playwright/mcp/cli.js",
+        "--headless",
+        "--isolated"
+      ]
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/node_modules/@upstash/context7-mcp/dist/index.js"
+      ]
+    },
+    "tavily": {
+      "type": "http",
+      "url": "https://mcp.tavily.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${input:tavily-api-key}"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "tavily-api-key",
+      "description": "Tavily API key for research (optional server)",
+      "password": true
+    }
+  ]
+}

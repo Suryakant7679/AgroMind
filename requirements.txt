@@ -1,14 +1,11 @@
-fastapi==0.115.12
-uvicorn[standard]==0.34.2
-jinja2==3.1.6
-python-dotenv==1.1.0
-python-multipart==0.0.20
-itsdangerous==2.2.0
-markdown==3.8
-supabase==2.15.2
-openai==1.82.0
-google-generativeai==0.8.5
-python-pptx==1.0.2
-pymupdf==1.26.0
-pytest==8.3.5
-youtube-transcript-api==1.2.4
+psycopg[binary]>=3.2,<4
+redis>=5,<8
+psutil>=5.9,<8
+qdrant-client>=1.15,<1.17
+mcp>=1.27,<2
+Pillow>=10,<13
+langgraph>=1.0.9,<1.1
+langsmith>=0.4,<0.5
+websockets>=14,<15
+# Keep compatibility with the FastAPI installation used by other local projects.
+starlette>=0.40,<0.47

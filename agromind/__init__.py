@@ -1,1 +1,0 @@
-"""AgroMind Python application package."""

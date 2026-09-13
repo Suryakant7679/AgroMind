@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Tutor</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <div class="brand-mark">A</div>
+        <button id="mobile-tools" class="icon-button" type="button" aria-label="Open tools">⚙</button>
+      </div>
+      <button id="new-chat" class="nav-action" type="button"><span>+</span> New chat</button>
+      <button id="search-chats" class="nav-action muted-action" type="button">Search chats</button>
+      <h2>Recent</h2>
+      <nav id="conversation-list" aria-label="Conversations"></nav>
+
+    </aside>
+
+    <main class="chat">
+      <header class="topbar">
+        <div class="model-title">AI Tutor</div>
+        <div class="topbar-actions">
+          <span id="account-label" class="account-label" hidden></span>
+          <button id="sign-out" class="ghost account-action" type="button" hidden>Sign out</button>
+        <button id="tools-toggle" class="icon-button" type="button" aria-label="Open workspace tools">⚙</button>
+        </div>
+      </header>
+
+      <section class="chat-stage">
+        <div id="empty-state" class="empty-state"></div>
+        <section id="messages" class="messages" aria-live="polite"></section>
+      </section>
+
+      <section class="composer-shell">
+        <form id="chat-form" class="composer">
+          <div id="drop-zone" class="drop-zone">
+            <input id="file-input" type="file" multiple accept=".txt,.md,.json,.csv,.py,.js,.html,.css,.pdf,.doc,.docx,.rtf,.odt,image/*,audio/*" />
+            <label class="plus-upload" for="file-input" aria-label="Upload files" data-tooltip="Upload files" tabindex="0">+</label>
+            <span id="attachment-count"></span>
+          </div>
+          <textarea id="message-input" rows="1" placeholder="Ask anything"></textarea>
+          <div class="composer-actions">
+            <button id="voice-input" class="round-action" type="button" aria-label="Start voice input">♪</button>
+            <button id="voice-output" class="round-action" type="button" aria-label="Speak last reply">◌</button>
+            <button id="send-message" class="round-action send-action" type="submit" aria-label="Send message">↑</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <dialog id="auth-dialog" class="auth-dialog" aria-labelledby="auth-title">
+      <div class="auth-brand">A</div>
+      <h2 id="auth-title">Welcome to AI Tutor</h2>
+      <p>Log in to continue, or sign up if this is your first visit.</p>
+      <form id="auth-form" class="auth-form">
+        <label><span>Name <small>(required for new accounts)</small></span><input id="auth-name" type="text" autocomplete="name" maxlength="120" placeholder="Your name" /></label>
+        <label><span>Email</span><input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com" /></label>
+        <label><span>Password</span><input id="auth-password" type="password" autocomplete="current-password" required minlength="8" placeholder="At least 8 characters" /></label>
+        <p id="auth-status" class="auth-status" role="alert" aria-live="polite"></p>
+        <div class="auth-actions">
+          <button id="sign-in" type="submit" data-auth-mode="login">Login</button>
+          <button id="create-account" class="ghost" type="submit" data-auth-mode="register">Sign up</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="chat-search-dialog" class="chat-search-dialog" aria-labelledby="chat-search-title">
+      <div class="search-dialog-heading">
+        <div>
+          <h2 id="chat-search-title">Search chats</h2>
+          <p>Describe what you remember. Results are matched by semantic meaning.</p>
+        </div>
+        <button id="close-chat-search" class="icon-button" type="button" aria-label="Close chat search">×</button>
+      </div>
+      <form id="chat-search-form" class="chat-search-form">
+        <input id="chat-search-query" type="search" autocomplete="off" placeholder="e.g. our discussion about vector databases" aria-label="Search previous chats" />
+        <button type="submit">Search</button>
+      </form>
+      <p id="chat-search-status" class="chat-search-status">Enter a phrase or describe the conversation you want to retrieve.</p>
+      <div id="chat-search-results" class="chat-search-results" aria-live="polite"></div>
+    </dialog>
+    <aside id="tool-panel" class="tool-panel">
+      <div class="panel-heading">
+        <h2>Workspace</h2>
+        <button id="close-tools" class="icon-button" type="button" aria-label="Close tools">×</button>
+      </div>
+      <section>
+        <div class="panel-heading">
+          <h3>Artifacts</h3>
+          <button id="refresh-artifacts" class="ghost" type="button">Refresh</button>
+        </div>
+        <div id="artifact-list" class="artifact-list"></div>
+      </section>
+
+      <section>
+        <div class="panel-heading">
+          <h3>System health</h3>
+          <button id="refresh-observability" class="ghost" type="button">Refresh</button>
+        </div>
+        <div id="observability-dashboard" class="observability-dashboard">
+          <div class="metric-card"><small>Loading observability...</small></div>
+        </div>
+      </section>
+      <section>
+        <h3>Settings</h3>
+        <label class="field">
+          <span>Mode</span>
+          <select id="theme-select">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Model mode</span>
+          <select id="provider-mode">
+            <option value="auto">Auto fallback</option>
+            <option value="groq">Groq</option>
+            <option value="gemini">Gemini</option>
+            <option value="openai">OpenAI</option>
+            <option value="deepseek">DeepSeek</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Context window tokens</span>
+          <input id="context-window" type="number" min="500" max="128000" step="500" />
+        </label>
+        <label class="field inline">
+          <input id="compact-mode" type="checkbox" />
+          <span>Compact messages</span>
+        </label>
+      </section>
+
+      <section>
+        <h3>Profile</h3>
+        <label class="field">
+          <span>Name</span>
+          <input id="profile-name" type="text" placeholder="Your name" />
+        </label>
+        <label class="field">
+          <span>Role</span>
+          <input id="profile-role" type="text" placeholder="Student, developer..." />
+        </label>
+      </section>
+
+      <section>
+        <h3>Project</h3>
+        <label class="field">
+          <span>Project</span>
+          <input id="workspace-name" type="text" placeholder="AI Tutor" />
+        </label>
+        <label class="field">
+          <span>Current focus</span>
+          <input id="workspace-focus" type="text" placeholder="Checkpoint 4" />
+        </label>
+        <label class="field">
+          <span>Running task</span>
+          <input id="running-task" type="text" placeholder="Implement session context" />
+        </label>
+        <label class="field">
+          <span>Active file</span>
+          <input id="active-file" type="text" placeholder="app/main.py" />
+        </label>
+        <label class="field">
+          <span>Active tool</span>
+          <input id="active-tool" type="text" placeholder="chat" />
+        </label>
+        <label class="field">
+          <span>Terminal output</span>
+          <textarea id="terminal-output" rows="4" placeholder="Paste recent command output"></textarea>
+        </label>
+        <label class="field">
+          <span>Browser results</span>
+          <textarea id="browser-results" rows="4" placeholder="Paste search or browser notes"></textarea>
+        </label>
+        <label class="field">
+          <span>MCP outputs</span>
+          <textarea id="mcp-outputs" rows="4" placeholder="Paste MCP or tool output"></textarea>
+        </label>
+        <label class="field">
+          <span>Developer instructions</span>
+          <textarea id="developer-instructions" rows="4" placeholder="Project-specific developer notes"></textarea>
+        </label>
+      </section>
+
+      <section>
+        <div class="panel-heading">
+          <h3>Conversation</h3>
+          <button id="new-thread" class="ghost" type="button">New thread</button>
+        </div>
+        <label class="field">
+          <span>Thread</span>
+          <select id="thread-select"></select>
+        </label>
+      </section>
+
+      <section>
+        <h3>Notifications</h3>
+        <div id="notification-list" class="notification-list"></div>
+      </section>
+    </aside>
+
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css"
+      crossorigin="anonymous"
+    />
+    <script
+      src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

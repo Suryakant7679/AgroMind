@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "aios-router": {"command": "python", "args": ["-m", "app.mcp.router_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor"},
+    "aios-filesystem": {"command": "python", "args": ["-m", "app.mcp.filesystem_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor", "env": {"AIOS_MCP_FILESYSTEM_WRITE": "false"}},
+    "aios-python": {"command": "python", "args": ["-m", "app.mcp.python_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor"},
+    "aios-terminal": {"command": "python", "args": ["-m", "app.mcp.terminal_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor"},
+    "aios-browser": {"command": "python", "args": ["-m", "app.mcp.browser_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor"},
+    "aios-duckduckgo": {"command": "python", "args": ["-m", "app.mcp.duckduckgo_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor"},
+    "aios-git": {"command": "python", "args": ["-m", "app.mcp.git_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor"},
+    "aios-github": {"command": "python", "args": ["-m", "app.mcp.github_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor"},
+    "aios-docker": {"command": "python", "args": ["-m", "app.mcp.docker_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor"},
+    "aios-kubernetes": {"command": "python", "args": ["-m", "app.mcp.kubernetes_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor"},
+    "aios-postgresql": {"command": "python", "args": ["-m", "app.mcp.postgresql_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor"},
+    "aios-sqlite": {"command": "python", "args": ["-m", "app.mcp.sqlite_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor"},
+    "aios-redis": {"command": "python", "args": ["-m", "app.mcp.redis_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor"},
+    "aios-cloud": {"command": "python", "args": ["-m", "app.mcp.cloud_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor"},
+    "aios-productivity": {"command": "python", "args": ["-m", "app.mcp.productivity_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor"},
+    "aios-rest": {"command": "python", "args": ["-m", "app.mcp.rest_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor", "env": {"AIOS_MCP_REST_WRITE": "false"}},
+    "aios-ocr": {"command": "python", "args": ["-m", "app.mcp.ocr_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor"},
+    "aios-image": {"command": "python", "args": ["-m", "app.mcp.image_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor", "env": {"AIOS_MCP_IMAGE_WRITE": "false"}},
+    "aios-custom": {"command": "python", "args": ["-m", "app.mcp.custom_server"], "cwd": "C:\\Users\\surya\\OneDrive\\Desktop\\AI tutor", "env": {"AIOS_MCP_CUSTOM_ENABLED": "false"}}
+  }
+}

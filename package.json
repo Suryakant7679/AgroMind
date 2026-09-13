@@ -1,0 +1,13 @@
+{
+  "name": "ai-tutor-dev-tools",
+  "private": true,
+  "scripts": {
+    "check:ui": "node --check web/app.js",
+    "mcp:playwright": "playwright-mcp --headless --isolated",
+    "mcp:context7": "context7-mcp"
+  },
+  "devDependencies": {
+    "@playwright/mcp": "0.0.80",
+    "@upstash/context7-mcp": "4.1.0"
+  }
+}
