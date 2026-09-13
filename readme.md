@@ -145,9 +145,16 @@ For scheduled jobs, start a worker and scheduler in separate terminals:
 
 Workers require Redis. Use a shared Chroma server when running multiple processes.
 
-See [Local Docker setup](docs/DEPLOYMENT.md) for AI Tutor, PostgreSQL, Redis,
-ChromaDB, and worker startup. The current Docker workflow runs AI Tutor; it does
-not launch the combined AgroMind portal automatically.
+The Docker image includes both AgroMind and AI Tutor, with PostgreSQL, Redis,
+ChromaDB, and workers managed by Compose. Follow [Docker setup](docs/DEPLOYMENT.md)
+to configure `.env.docker`, then run:
+
+```powershell
+docker compose --env-file .env.docker up -d --build
+```
+
+Open AgroMind at **http://127.0.0.1:18080** and AI Tutor at
+**http://127.0.0.1:18010**. The default Docker stack does not use Qdrant.
 
 ## Keeping your data
 
@@ -160,6 +167,7 @@ To copy existing vectors into ChromaDB, stop writers and run the appropriate com
 ```powershell
 .\.venv\Scripts\python.exe -m app.import_vectors_to_chroma --source json
 # Or, with your existing QDRANT_* connection settings:
+.\.venv\Scripts\python.exe -m pip install -r requirements-qdrant-migration.txt
 .\.venv\Scripts\python.exe -m app.import_vectors_to_chroma --source qdrant
 ```
 
@@ -183,7 +191,7 @@ docs/              Setup, audit, and development notes
 scripts/           Backup, restore, and development utilities
 run_integrated.py  Starts AgroMind and AI Tutor together
 run.py             Starts only AgroMind
-Dockerfile         AI Tutor container image
+Dockerfile         Shared AgroMind and AI Tutor container image
 docker-compose.yml Local AI Tutor infrastructure and workers
 ```
 

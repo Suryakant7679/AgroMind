@@ -1,12 +1,26 @@
-name: aios
+name: agromind
+
+x-runtime-environment: &runtime-environment
+  AIOS_HOST: 0.0.0.0
+  AIOS_PORT: "8000"
+  AIOS_STORAGE_BACKEND: postgres
+  DATABASE_URL: postgresql://${POSTGRES_USER:-aios}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your Compose env file}@postgres:5432/${POSTGRES_DB:-aios}
+  AGROMIND_DATABASE_URL: ""
+  REDIS_URL: redis://redis:6379/0
+  AIOS_VECTOR_BACKEND: chroma
+  CHROMA_HOST: chroma
+  CHROMA_PORT: "8000"
+  QDRANT_URL: ""
+  QDRANT_API_KEY: ""
 
 x-aios-service: &aios-service
-  image: ${AIOS_IMAGE:-aios:latest}
+  image: ${AIOS_IMAGE:-agromind:local}
   build:
     context: .
     dockerfile: Dockerfile
   env_file:
     - ${AIOS_ENV_FILE:-.env.production}
+  environment: *runtime-environment
   restart: unless-stopped
   volumes:
     - aios_data:/app/data
@@ -21,6 +35,10 @@ x-aios-service: &aios-service
 services:
   postgres:
     image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aios}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your Compose env file}
+      POSTGRES_DB: ${POSTGRES_DB:-aios}
     env_file:
       - ${AIOS_ENV_FILE:-.env.production}
     restart: unless-stopped
@@ -47,7 +65,7 @@ services:
     networks: [backend]
 
   chroma:
-    image: ${AIOS_IMAGE:-aios:latest}
+    image: ${AIOS_IMAGE:-agromind:local}
     build:
       context: .
       dockerfile: Dockerfile
@@ -62,26 +80,14 @@ services:
       retries: 15
     networks: [backend]
 
-  qdrant:
-    profiles: ["legacy-qdrant"]
-    image: qdrant/qdrant:v1.15.4
-    restart: unless-stopped
-    volumes:
-      - qdrant_data:/qdrant/storage
-    healthcheck:
-      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333'"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-    networks: [backend]
-
   migrate:
-    image: ${AIOS_IMAGE:-aios:latest}
+    image: ${AIOS_IMAGE:-agromind:local}
     build:
       context: .
       dockerfile: Dockerfile
     env_file:
       - ${AIOS_ENV_FILE:-.env.production}
+    environment: *runtime-environment
     command: ["python", "-m", "app.migrate"]
     restart: "no"
     depends_on:
@@ -92,7 +98,19 @@ services:
   app:
     <<: *aios-service
     command: ["python", "-m", "app.main"]
-    expose: ["8000"]
+    ports: ["127.0.0.1:${AI_TUTOR_DOCKER_PORT:-18010}:8000"]
+    networks: [backend, edge]
+
+  portal:
+    <<: *aios-service
+    command: ["python", "-m", "uvicorn", "agromind.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      <<: *runtime-environment
+      AI_TUTOR_URL: http://127.0.0.1:${AI_TUTOR_DOCKER_PORT:-18010}
+    ports: ["127.0.0.1:${AGROMIND_DOCKER_PORT:-18080}:8000"]
+    volumes:
+      - aios_data:/app/data
+      - agromind_uploads:/app/agromind/static/uploads
     networks: [backend, edge]
 
   worker:
@@ -100,23 +118,24 @@ services:
     command: ["python", "-m", "app.workers", "--worker", "all", "--poll-timeout", "2"]
     healthcheck:
       disable: true
-    networks: [backend]
+    networks: [backend, edge]
 
   scheduler:
     <<: *aios-service
     command: ["python", "-m", "app.workers", "--worker", "scheduler", "--poll-timeout", "5"]
     healthcheck:
       disable: true
-    networks: [backend]
+    networks: [backend, edge]
 
   monitoring:
     <<: *aios-service
     command: ["python", "-m", "app.workers", "--worker", "health", "--poll-timeout", "5"]
     healthcheck:
       disable: true
-    networks: [backend]
+    networks: [backend, edge]
 
   nginx:
+    profiles: ["tls"]
     image: nginx:1.27-alpine
     restart: unless-stopped
     depends_on:
@@ -138,9 +157,9 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  qdrant_data:
   chroma_data:
   aios_data:
+  agromind_uploads:
 
 networks:
   backend:

@@ -4,7 +4,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     AIOS_HOST=0.0.0.0 \
-    AIOS_PORT=8000
+    AIOS_PORT=8000 \
+    AIOS_STORAGE_BACKEND=postgres \
+    AIOS_VECTOR_BACKEND=chroma
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates poppler-utils tesseract-ocr \
@@ -13,13 +15,17 @@ RUN apt-get update \
     && useradd --system --gid aios --create-home --home-dir /home/aios aios
 
 WORKDIR /app
-COPY requirements.txt ./
+COPY requirements.txt pyproject.toml ./
 RUN python -m pip install --upgrade pip \
-    && python -m pip install -r requirements.txt
+    && python -c "import subprocess, sys, tomllib; deps = tomllib.load(open('pyproject.toml', 'rb'))['project']['dependencies']; subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-r', 'requirements.txt', *deps])"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --chown=aios:aios . .
-RUN mkdir -p /app/data/uploads /app/data/backups /app/data/worker_state \
-    && chown -R aios:aios /app/data
+RUN mkdir -p /app/data/uploads /app/data/backups /app/data/worker_state /app/agromind/static/uploads \
+    && chown -R aios:aios /app/data /app/agromind/static/uploads
 
 USER aios
 EXPOSE 8000

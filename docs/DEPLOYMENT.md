@@ -1,60 +1,87 @@
-# Complete local Docker startup
+# Run the complete application with Docker
 
-The Dockerfile, Compose services, Nginx and backup utilities remain intact.
-They support local/self-hosted use and are not tied to a hosting provider.
+Use Docker Desktop with Linux containers. One image, `agromind:local`, contains
+both Python applications, their frontend files, PostgreSQL drivers, the ChromaDB
+client/server, Git, Poppler, and Tesseract. Containers run as a non-root user.
 
-Start Docker Desktop with Linux containers. In PowerShell at the project root:
+## First-time setup
 
-```powershell
-if (-not (Test-Path .env.production)) { Copy-Item .env.production.example .env.production }
-```
-
-Review `.env.production`. Configure `DATABASE_URL` for `postgres:5432`,
-`REDIS_URL` for `redis:6379/0`, and `AIOS_VECTOR_BACKEND=chroma`, `CHROMA_HOST=chroma`, `CHROMA_PORT=8000`.
-Database credentials must match `POSTGRES_USER`, `POSTGRES_PASSWORD` and
-`POSTGRES_DB`. Existing Qdrant credentials can remain for migration; they are unused in Chroma mode.
-Keep authentication enabled, set a strong stable `AIOS_JWT_SECRET`, configure
-`GROQ_API_KEY` and/or `GEMINI_API_KEY`, and replace applicable `CHANGE_ME` values.
-The supplied example already uses local service names. Do not overwrite existing
-credentials or data; moving a hosted database locally requires a separate import.
-
-Start infrastructure and all background processes:
+From the project root in PowerShell:
 
 ```powershell
-docker compose --env-file .env.production up -d --build postgres redis chroma migrate worker scheduler monitoring
+if (-not (Test-Path .env.docker)) { Copy-Item .env.docker.example .env.docker }
 ```
 
-Start the frontend and API together on a loopback-only port:
+Edit `.env.docker`. Replace each `CHANGE_ME` secret with a different random value:
 
 ```powershell
-docker compose --env-file .env.production run --rm --no-deps --publish 127.0.0.1:8000:8000 app
+python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-Open **http://localhost:8000**. The image includes Poppler and Tesseract.
-This command uses the normal application and shared data volume, with no TLS
-certificates or separate frontend process required. The optional Nginx entrypoint
-remains available but is not needed for this localhost HTTP workflow.
+Use a URL-safe database password, such as the generated hex value. Add your model
+API key to `GROQ_API_KEY` or `GEMINI_API_KEY`. Keep this file private.
+Compose supplies the container database, Redis, and Chroma addresses automatically.
+Native `.env` settings and data are not included in the image.
 
-The app retains its edge network for external model calls. Existing workers use
-an internal backend network; jobs requiring external access (such as SMTP) need
-appropriate networking or native workers. No subsystem has been simplified.
-
-Stop the foreground app with Ctrl+C, then stop other services without deleting data:
+## Build and start
 
 ```powershell
-docker compose --env-file .env.production stop
+docker compose --env-file .env.docker build
+docker compose --env-file .env.docker up -d
 ```
 
-Do not remove volumes to stop the application. Native Python startup is in the
-[README](../readme.md). Model APIs, web search and CDN assets still use the internet.
+Open:
 
-## Verification
+- AgroMind: **http://127.0.0.1:18080**
+- AI Tutor: **http://127.0.0.1:18010**
+
+The Docker ports differ from native Python ports so both setups can coexist.
+To change them, edit `AGROMIND_DOCKER_PORT` and `AI_TUTOR_DOCKER_PORT` in
+`.env.docker`, then run `up -d` again. AgroMind's chatbot iframe uses the Tutor port.
+Each app has its own signup and login. PostgreSQL tables are initialized automatically.
+
+Compose starts PostgreSQL, Redis, ChromaDB, the migration job, AI Tutor (`app`),
+AgroMind (`portal`), and the worker, scheduler, and monitoring processes. Workers
+can access external APIs. Database and vector ports are not published to the host.
+The optional existing Nginx TLS service runs only with `--profile tls` and needs
+certificates; it is not required for the localhost setup.
+
+## Verify and manage
 
 ```powershell
-Invoke-RestMethod http://localhost:8000/api/v1/health
-node --check web/app.js
-python -m pytest -q
+docker compose --env-file .env.docker ps
+Invoke-RestMethod http://127.0.0.1:18080/api/health
+Invoke-RestMethod http://127.0.0.1:18010/api/v1/health
+docker compose --env-file .env.docker logs --tail 50 app portal chroma
 ```
 
-Open the UI, sign up/log in, send a message, upload a document and reopen history.
-Health alone does not verify model credentials or every database operation.
+To rebuild after a code change:
+
+```powershell
+docker compose --env-file .env.docker up -d --build
+```
+
+Stop the application while keeping data:
+
+```powershell
+docker compose --env-file .env.docker stop
+```
+
+Named volumes preserve PostgreSQL records, Chroma vectors, Redis state, AI Tutor
+files, and AgroMind uploads. Existing native records and older Docker volumes are
+not imported automatically. Avoid `down -v` unless you intend to delete this
+stack's saved data.
+
+The default image has no Qdrant service or client dependency. For a one-time import
+from an old Qdrant instance, install `requirements-qdrant-migration.txt` in a native
+Python environment and use `python -m app.import_vectors_to_chroma --source qdrant`.
+No existing Qdrant containers or data are removed by this setup.
+
+## Run the container tests
+
+```powershell
+docker compose --env-file .env.docker exec -T portal python scripts/test_container.py
+```
+
+This creates a disposable test checkout. PostgreSQL test records are rolled back,
+and the Chroma integration check deletes its own temporary collection.

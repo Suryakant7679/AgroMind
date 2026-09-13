@@ -342,6 +342,9 @@ class VectorStoreTests(unittest.TestCase):
 
 
     def test_qdrant_collection_creation_tolerates_concurrent_creator(self) -> None:
+        import importlib.util
+        if importlib.util.find_spec("qdrant_client") is None:
+            self.skipTest("Optional Qdrant migration dependency is not installed")
         class RacingClient:
             def __init__(self):
                 self.exists_checks = 0
@@ -1629,12 +1632,13 @@ class UploadParsingTests(unittest.TestCase):
         old_pdf_command = os.environ.pop("AIOS_PDF_OCR_COMMAND", None)
         old_ocr_command = os.environ.pop("AIOS_OCR_COMMAND", None)
         try:
-            metadata = document_metadata_for_upload(
-                "scan.pdf",
-                "application/pdf",
-                b"%PDF-1.4\n%%EOF",
-                Path("scan.pdf"),
-            )
+            with mock.patch("app.main.shutil.which", return_value=None):
+                metadata = document_metadata_for_upload(
+                    "scan.pdf",
+                    "application/pdf",
+                    b"%PDF-1.4\n%%EOF",
+                    Path("scan.pdf"),
+                )
         finally:
             if old_pdf_command is not None:
                 os.environ["AIOS_PDF_OCR_COMMAND"] = old_pdf_command

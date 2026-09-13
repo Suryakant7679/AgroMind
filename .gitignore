@@ -27,3 +27,6 @@ data/chroma/
 # Local AgroMind secrets and user uploads
 .env.local
 agromind/static/uploads/
+
+.env.docker
+*.log

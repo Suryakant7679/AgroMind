@@ -54,3 +54,23 @@ def test_hybrid_retrieval_preserves_tenant_filter(tmp_path, monkeypatch):
     results = main.hybrid_retrieve("photosynthesis", user_id="alice")
     assert [r["id"] for r in results] == ["mine"]
     assert results[0]["metadata"] == {"nested": [1, None]}
+
+
+def test_http_server_round_trip(tmp_path):
+    """Opt-in verification against a running Chroma server, using a private collection."""
+    import os
+    import uuid
+    host = os.getenv("CHROMA_TEST_HOST")
+    if not host:
+        pytest.skip("Set CHROMA_TEST_HOST for the Chroma HTTP integration test")
+    name = "test_" + uuid.uuid4().hex
+    port = int(os.getenv("CHROMA_TEST_PORT", "8000"))
+    store = ChromaVectorStore(tmp_path, name, 3, host, port)
+    try:
+        store.upsert([record()])
+        reopened = ChromaVectorStore(tmp_path, name, 3, host, port)
+        assert reopened.load() == [record()]
+        result = reopened.collection.query(query_embeddings=[[1.0, 0.0, 0.0]], n_results=1)
+        assert result["ids"] == [["one"]]
+    finally:
+        store.client.delete_collection(name)
