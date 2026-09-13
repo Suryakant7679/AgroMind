@@ -10,9 +10,9 @@ if (-not (Test-Path .env.production)) { Copy-Item .env.production.example .env.p
 ```
 
 Review `.env.production`. Configure `DATABASE_URL` for `postgres:5432`,
-`REDIS_URL` for `redis:6379/0`, and `QDRANT_URL` for `http://qdrant:6333`.
+`REDIS_URL` for `redis:6379/0`, and `AIOS_VECTOR_BACKEND=chroma`, `CHROMA_HOST=chroma`, `CHROMA_PORT=8000`.
 Database credentials must match `POSTGRES_USER`, `POSTGRES_PASSWORD` and
-`POSTGRES_DB`. Clear `QDRANT_API_KEY` for the default local Qdrant service.
+`POSTGRES_DB`. Existing Qdrant credentials can remain for migration; they are unused in Chroma mode.
 Keep authentication enabled, set a strong stable `AIOS_JWT_SECRET`, configure
 `GROQ_API_KEY` and/or `GEMINI_API_KEY`, and replace applicable `CHANGE_ME` values.
 The supplied example already uses local service names. Do not overwrite existing
@@ -21,7 +21,7 @@ credentials or data; moving a hosted database locally requires a separate import
 Start infrastructure and all background processes:
 
 ```powershell
-docker compose --env-file .env.production up -d --build postgres redis qdrant migrate worker scheduler monitoring
+docker compose --env-file .env.production up -d --build postgres redis chroma migrate worker scheduler monitoring
 ```
 
 Start the frontend and API together on a loopback-only port:

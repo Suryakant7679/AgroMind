@@ -15,7 +15,7 @@ x-aios-service: &aios-service
       condition: service_completed_successfully
     redis:
       condition: service_healthy
-    qdrant:
+    chroma:
       condition: service_healthy
 
 services:
@@ -46,7 +46,24 @@ services:
       retries: 10
     networks: [backend]
 
+  chroma:
+    image: ${AIOS_IMAGE:-aios:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["chroma", "run", "--host", "0.0.0.0", "--port", "8000", "--path", "/app/data/chroma"]
+    restart: unless-stopped
+    volumes:
+      - chroma_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v2/heartbeat', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks: [backend]
+
   qdrant:
+    profiles: ["legacy-qdrant"]
     image: qdrant/qdrant:v1.15.4
     restart: unless-stopped
     volumes:
@@ -122,6 +139,7 @@ volumes:
   postgres_data:
   redis_data:
   qdrant_data:
+  chroma_data:
   aios_data:
 
 networks:

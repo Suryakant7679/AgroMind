@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .ai-tutor-heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+  .ai-tutor-frame { display:block; width:100%; height:calc(100dvh - 11rem); min-height:32rem; border:1px solid var(--line); border-radius:0.75rem; background:#fff; }
+  @media(max-width:560px) { .ai-tutor-heading { align-items:flex-start; flex-direction:column; } }
+</style>
+<div class="ai-tutor-heading">
+  <h1 class="page-title">AI Tutor Chatbot</h1>
+  <a class="button secondary" href="{{ ai_tutor_url }}" target="_blank" rel="noopener">Open separately</a>
+</div>
+<iframe class="ai-tutor-frame" src="{{ ai_tutor_url }}" title="AI Tutor Chatbot" allow="microphone" referrerpolicy="same-origin"></iframe>
+<p class="muted">If the chatbot does not load, start the local AI Tutor service and reload this page.</p>
+{% endblock %}

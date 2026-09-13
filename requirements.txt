@@ -1,6 +1,8 @@
 psycopg[binary]>=3.2,<4
 redis>=5,<8
 psutil>=5.9,<8
+chromadb==1.5.9
+# Legacy reader retained only for optional Qdrant migration.
 qdrant-client>=1.15,<1.17
 mcp>=1.27,<2
 Pillow>=10,<13

@@ -13,7 +13,7 @@ EXCLUDED_PARTS = {".git", ".venv", "venv", "node_modules", "data", "dist", "buil
 def main() -> None:
     load_env()
     from app.main import EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, chunk_document_text, generate_embedding, utc_now
-    from app.vector_store import QdrantVectorStore
+    from app.main import VECTOR_STORE
 
     root = Path(os.getenv("AIOS_CODE_ROOT", Path(__file__).resolve().parents[1])).resolve()
     records = []
@@ -36,7 +36,7 @@ def main() -> None:
                 "metadata": {"source_path": str(path), "start_char": chunk["start_char"], "end_char": chunk["end_char"]},
                 "created_at": utc_now(),
             })
-    store = QdrantVectorStore(os.environ["QDRANT_URL"], os.getenv("QDRANT_COLLECTION", "aios_embeddings"), EMBEDDING_DIMENSIONS, os.getenv("QDRANT_API_KEY", ""))
+    store = VECTOR_STORE
     store.replace_source("code", records)
     print(f"Indexed {len(records)} code chunk(s) from {root}.")
 

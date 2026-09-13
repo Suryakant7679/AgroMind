@@ -20,3 +20,10 @@ deploy/certs/*.pem
 deployment-backups/
 
 .playwright-mcp/
+
+.venv-chroma/
+data/chroma/
+
+# Local AgroMind secrets and user uploads
+.env.local
+agromind/static/uploads/

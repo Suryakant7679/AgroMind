@@ -101,8 +101,91 @@ class QdrantVectorStore:
         )
 
 
+class ChromaVectorStore:
+    """Preserve complete RAG records while storing supplied vectors in Chroma."""
+
+    def __init__(self, path: Path, collection: str, dimensions: int, host: str = "", port: int = 8000) -> None:
+        import chromadb
+        self.dimensions = dimensions
+        self.client = chromadb.HttpClient(host=host, port=port) if host else chromadb.PersistentClient(path=str(path))
+        self.collection = self.client.get_or_create_collection(
+            name=collection, embedding_function=None,
+            metadata={"hnsw:space": "cosine", "dimensions": dimensions},
+        )
+        if (self.collection.metadata or {}).get("dimensions", dimensions) != dimensions:
+            raise ValueError("Chroma collection embedding dimensions do not match configuration")
+
+    def load(self) -> list[dict[str, Any]]:
+        records = []
+        offset = 0
+        while True:
+            page = self.collection.get(limit=256, offset=offset, include=["metadatas", "embeddings"])
+            for index, metadata in enumerate(page["metadatas"]):
+                record = json.loads(metadata["record_json"])
+                record["embedding"] = [float(value) for value in page["embeddings"][index]]
+                records.append(record)
+            if len(page["ids"]) < 256:
+                return records
+            offset += len(page["ids"])
+
+    def _validate(self, records: list[dict[str, Any]]) -> None:
+        import math
+        ids = [str(record["id"]) for record in records]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Duplicate vector record IDs")
+        for record in records:
+            vector = record.get("embedding", [])
+            if len(vector) != self.dimensions or not all(math.isfinite(float(value)) for value in vector):
+                raise ValueError("Invalid embedding dimensions or non-finite values")
+            json.dumps({key: value for key, value in record.items() if key != "embedding"}, allow_nan=False)
+
+    def _write(self, records: list[dict[str, Any]]) -> None:
+        for start in range(0, len(records), 128):
+            batch = records[start:start + 128]
+            metadata = []
+            for record in batch:
+                payload = {key: value for key, value in record.items() if key != "embedding"}
+                metadata.append({
+                    "record_json": json.dumps(payload),
+                    "source_type": str(record.get("source_type") or "document"),
+                    "artifact_id": str(record.get("artifact_id") or ""),
+                    "user_id": str(record.get("user_id") or ""),
+                })
+            self.collection.upsert(ids=[str(r["id"]) for r in batch],
+                                   embeddings=[r["embedding"] for r in batch], metadatas=metadata)
+
+    def upsert(self, records: list[dict[str, Any]]) -> None:
+        self._validate(records)
+        for artifact_id in {str(r["artifact_id"]) for r in records if r.get("artifact_id")}:
+            self.collection.delete(where={"artifact_id": artifact_id})
+        self._write(records)
+
+    def replace_source(self, source_type: str, records: list[dict[str, Any]]) -> None:
+        self._validate(records)
+        self.collection.delete(where={"source_type": source_type})
+        self.upsert(records)
+
+    def replace_all(self, records: list[dict[str, Any]]) -> None:
+        self._validate(records)
+        while True:
+            ids = self.collection.get(limit=256, include=[])["ids"]
+            if not ids:
+                break
+            self.collection.delete(ids=ids)
+        self._write(records)
+
+
+def create_chroma_store(dimensions: int) -> ChromaVectorStore:
+    root = Path(__file__).resolve().parents[1]
+    path = root / os.getenv("AIOS_CHROMA_PATH", "data/chroma")
+    return ChromaVectorStore(path, os.getenv("CHROMA_COLLECTION", "aios_embeddings"), dimensions,
+                             os.getenv("CHROMA_HOST", ""), int(os.getenv("CHROMA_PORT", "8000")))
+
+
 def create_vector_store(path: Path, model: str, dimensions: int):
     backend = os.getenv("AIOS_VECTOR_BACKEND", "auto").strip().lower()
+    if backend in {"chroma", "chromadb"}:
+        return create_chroma_store(dimensions)
     url = os.getenv("QDRANT_URL", "").strip()
     if backend == "json" or (backend == "auto" and not url):
         return JsonVectorStore(path, model, dimensions)

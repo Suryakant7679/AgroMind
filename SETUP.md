@@ -203,20 +203,20 @@ Provider cost remains an estimate and requires the configured
 `python -m pip install -r requirements.txt` after pulling changes so `psutil`
 is available for CPU and memory metrics.
 
-## Qdrant vector storage
+## ChromaDB vector storage
 
-Start Qdrant with a persistent Docker volume:
+ChromaDB is the vector backend in the updated configuration templates. Install
+`requirements.txt`, set `AIOS_VECTOR_BACKEND=chroma`, and use `AIOS_CHROMA_PATH`
+for native persistent storage. A blank `CHROMA_HOST` selects an embedded client.
+Use a shared Chroma server for multiple app/worker processes; Docker Compose
+provides it with `CHROMA_HOST=chroma` and `CHROMA_PORT=8000`.
 
-```powershell
-docker run --name aios-qdrant -p 6333:6333 -p 6334:6334 -v aios-qdrant-data:/qdrant/storage -d qdrant/qdrant:latest
-```
-
-Configure `QDRANT_URL=http://127.0.0.1:6333` and run
-`python -m app.import_vectors_to_qdrant` once. Index the current repository with
-`python -m app.index_workspace_code`. The `aios_embeddings` collection
-stores document, memory, code, and conversation points in one collection with
-filterable `source_type` payloads. Uploaded bytes remain under `data/uploads`
-and artifact metadata remains in `data/uploads.json`.
+Existing private environment files and Qdrant data are preserved. Stop writers,
+run `python -m app.import_vectors_to_chroma --source qdrant` (or `--source json`),
+then select Chroma in your environment and restart. Keep the source available
+until retrieval has been verified. See the README for migration details.
+The legacy Qdrant adapter remains available for migration and compatibility.
+Uploaded files and metadata remain in their existing locations.
 
 ## Local application
 

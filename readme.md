@@ -10,7 +10,7 @@ No separate frontend server or frontend build is required.
 ```text
 Browser -> localhost:8000 -> Python HTTP server
                             |-- static frontend and authenticated API
-                            |-- PostgreSQL / Redis / Qdrant
+                            |-- PostgreSQL / Redis / ChromaDB
                             |-- local uploads and memory
                             `-- external model provider
 ```
@@ -25,7 +25,7 @@ Their implementations have not been replaced.
 - Streaming assistant responses with cancellation and recovery
 - PDF and text uploads with extracted document context
 - Hidden attachment context: extracted PDF text is not displayed as the user's prompt
-- Retrieval-backed document and conversation context through Qdrant
+- Retrieval-backed document and conversation context through ChromaDB
 - Mathematical answers rendered with KaTeX/LaTeX
 - Markdown, syntax-highlighted code, speech input, and text-to-speech
 - Multiple AI providers with automatic fallback and task-aware routing
@@ -35,11 +35,11 @@ Their implementations have not been replaced.
 
 ## Start on localhost (PowerShell)
 
-For the complete stack including local PostgreSQL, Redis, Qdrant, workers and
+For the complete stack including local PostgreSQL, Redis, ChromaDB, workers and
 PDF/OCR executables, follow [Local Docker startup](docs/DEPLOYMENT.md).
 
 For native Python startup, install Python 3.12+ and provide local PostgreSQL,
-Redis and Qdrant services. From the project root:
+Redis and ChromaDB services. From the project root:
 
 ```powershell
 python -m venv .venv
@@ -56,9 +56,10 @@ AIOS_AUTH_REQUIRED=true
 AIOS_STORAGE_BACKEND=postgres
 DATABASE_URL=postgresql://USER:PASSWORD@127.0.0.1:5432/aios
 REDIS_URL=redis://127.0.0.1:6379/0
-AIOS_VECTOR_BACKEND=qdrant
-QDRANT_URL=http://127.0.0.1:6333
-QDRANT_API_KEY=
+AIOS_VECTOR_BACKEND=chroma
+AIOS_CHROMA_PATH=data/chroma
+CHROMA_HOST=
+CHROMA_COLLECTION=aios_embeddings
 AIOS_PROVIDER=auto
 ```
 
@@ -137,7 +138,7 @@ Dockerfile       Local/self-hosted application image
 
 ## Local persistence
 
-Preserve PostgreSQL, Redis and Qdrant volumes and the application data directory.
+Preserve PostgreSQL, Redis and ChromaDB volumes and the application data directory.
 Uploads and some memory/metrics remain local files; back up those alongside the
 database. External AI services retain their own quotas and rate limits.
 
@@ -156,3 +157,46 @@ No license has been declared. All rights remain with the repository owner unless
 
 - [Verified bugs, fixes, and remaining work](docs/BUG_AUDIT.md)
 - [Installed MCP servers and setup](docs/MCP_SETUP.md)
+
+## ChromaDB vector storage
+
+Install updated requirements in your Python environment. Use
+`AIOS_VECTOR_BACKEND=chroma` and leave `CHROMA_HOST` blank for a single native
+process with persistent storage at `data/chroma`. For multiple processes/workers,
+run a shared Chroma server and set `CHROMA_HOST` and `CHROMA_PORT` in every process.
+Compose uses this client/server configuration by default. Chroma receives the
+existing hash-based embeddings; no embedding model download is needed.
+The application still performs its existing hybrid ranking; this change does
+not replace the embedding algorithm or improve semantic quality by itself.
+
+Existing private `.env` files are preserved. Before switching an existing store,
+stop writers and copy its vectors using one of these commands:
+
+```powershell
+python -m app.import_vectors_to_chroma --source json
+# Or, with the old QDRANT_* connection settings retained:
+python -m app.import_vectors_to_chroma --source qdrant
+```
+
+Both commands preserve their source and verify the copied records. Then set
+`AIOS_VECTOR_BACKEND=chroma` in `.env` (and `.env.production` for Compose), set
+`CHROMA_HOST=chroma` for Compose, and restart. Preserve the old database until
+retrieval has been checked. JSON and legacy Qdrant adapters remain for compatibility;
+the old Docker service is available only with `--profile legacy-qdrant`.
+[Chroma Python client reference](https://docs.trychroma.com/reference/python/client).
+
+## AI Tutor inside AgroMind
+
+`python run_integrated.py` starts AgroMind at http://127.0.0.1:8000 and AI Tutor
+at http://127.0.0.1:8010. The authenticated AgroMind `/chatbot` page now shows only
+AI Tutor, including its own login, history, attachments and streaming interface.
+It no longer falls back to the workspace chatbot UI or a hosted tutor URL.
+The two applications retain separate authentication. The legacy workspace-chat
+API remains available for compatibility but is not used by this page.
+
+Run with a Python environment containing both applications' dependencies, including
+ChromaDB when configured (the `.venv-chroma` environment created during setup).
+The launcher preserves configured database/vector backends, starts the tutor from
+this folder by default, and waits for its health endpoint before opening AgroMind.
+Stop with Ctrl+C. Existing Supabase configuration is still required for AgroMind
+login; it is not replaced by the tutor's JWT authentication.

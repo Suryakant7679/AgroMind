@@ -68,7 +68,7 @@ class DeploymentConfigurationTests(unittest.TestCase):
 
     def test_compose_contains_complete_checkpoint_stack(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
-        for service in ("postgres", "redis", "qdrant", "migrate", "app", "worker", "scheduler", "monitoring", "nginx"):
+        for service in ("postgres", "redis", "chroma", "migrate", "app", "worker", "scheduler", "monitoring", "nginx"):
             self.assertIn(f"  {service}:", compose)
         self.assertIn("service_completed_successfully", compose)
         self.assertIn("internal: true", compose)
@@ -86,7 +86,7 @@ class DeploymentConfigurationTests(unittest.TestCase):
         template = (ROOT / ".env.production.example").read_text(encoding="utf-8")
         self.assertIn("AIOS_AUTH_REQUIRED=true", template)
         self.assertIn("AIOS_STORAGE_BACKEND=postgres", template)
-        self.assertIn("AIOS_VECTOR_BACKEND=qdrant", template)
+        self.assertIn("AIOS_VECTOR_BACKEND=chroma", template)
         self.assertIn("CHANGE_ME_AT_LEAST_32_RANDOM_BYTES", template)
         restore = (ROOT / "scripts" / "restore.ps1").read_text(encoding="utf-8")
         self.assertIn("[switch]$Force", restore)
